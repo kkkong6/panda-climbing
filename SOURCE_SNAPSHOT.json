@@ -1,0 +1,15 @@
+{
+  "created_at": "2026-10-17T08:06:46.493260+00:00",
+  "server": {
+    "upstream": "https://github.com/xinnan-tech/xiaozhi-esp32-server",
+    "baseline": "local downloaded upstream archive; exact upstream commit unavailable",
+    "archive_sha256": "fbf107a421662f4a81b5c75a11322e979fdb55086ed4cd0445922b5e83cadb3a"
+  },
+  "firmware": {
+    "upstream": "https://github.com/78/xiaozhi-esp32",
+    "source_head": "6d7d37b95fd63a9ef46fde930ab3731689b256ca",
+    "includes_uncommitted_changes": true,
+    "baseline": "9c20776",
+    "sdk": "ESP-IDF 6.0.2 (existing local build environment)"
+  }
+}

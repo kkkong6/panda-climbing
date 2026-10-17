@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="690" viewBox="0 0 1200 690" role="img" aria-labelledby="t d">
+<title id="t">Step 四种能力协同理解与回应</title><desc id="d">录音并行送入 step-asr 与 stepaudio-3-chat-preview。文字和情绪线索交给 step-3.7-flash，回答和语气提示交给 stepaudio-3-tts，生成设备播报。</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#817b70"/></marker><style>text{font-family:"PingFang SC","Microsoft YaHei",sans-serif;fill:#24231f}.h{font-size:23px;font-weight:700}.b{font-size:19px}.s{font-size:16px;fill:#756f64}.a{fill:none;stroke:#817b70;stroke-width:2;marker-end:url(#a)}</style></defs>
+<rect width="1200" height="690" rx="24" fill="#f3f2ee"/>
+<text x="45" y="62" style="font-size:31px;font-weight:800">听清内容，理解情境，把回应说到心里。</text>
+<text x="45" y="103" class="s">四种 Step 能力分别承担输入理解、回应推理与情感表达</text>
+<rect x="40" y="172" width="245" height="226" rx="18" fill="#24231f"/>
+<text x="63" y="215" style="fill:#f7c600;font-size:23px;font-weight:700">设备录音</text>
+<path d="M64 270H81L89 248L99 297L110 235L122 311L135 253L147 285L158 258L171 298L183 249L194 287L206 270H258" fill="none" stroke="#f7c600" stroke-width="3"/>
+<text x="64" y="351" style="fill:white;font-size:21px">“又掉了……”</text>
+<g fill="#fff"><rect x="370" y="152" width="347" height="126" rx="17"/><rect x="370" y="315" width="347" height="126" rx="17"/><rect x="804" y="172" width="356" height="226" rx="18"/></g>
+<text x="393" y="190" class="h">① 语音识别</text><text x="393" y="224" class="s">step-asr</text><text x="393" y="255" class="b">输出：用户说了什么</text>
+<text x="393" y="351" class="h">② 声音情绪分析</text><text x="393" y="385" class="s">stepaudio-3-chat-preview</text><text x="393" y="417" class="b">输出：情绪、强度、声音依据</text>
+<path d="M285 268H326V215H368M326 268V378H368" class="a"/>
+<text x="310" y="469" class="s">同一份录音，并行处理</text>
+<text x="828" y="215" class="h">③ 理解与回应</text><text x="828" y="251" class="s">step-3.7-flash</text><text x="828" y="303" class="b">结合对话与情绪线索</text><text x="828" y="341" class="b">生成回答 + 语气提示</text>
+<path d="M717 215H802M717 378H759V321H802" class="a"/>
+<rect x="804" y="487" width="356" height="150" rx="18" fill="#fff0ae"/>
+<text x="828" y="527" class="h">④ 情感语音合成</text><text x="828" y="563" class="s">stepaudio-3-tts</text><text x="828" y="602" class="b">按语气指令合成声音</text>
+<path d="M983 398V485" class="a"/>
+<rect x="40" y="517" width="630" height="120" rx="18" fill="#e7e4dc"/>
+<text x="65" y="558" class="h">小搭开口回应</text><text x="65" y="602" class="b">“有点挫败吧，先缓一缓，愿意说说卡在哪吗？”</text>
+<path d="M804 571H672" class="a"/>
+</svg>

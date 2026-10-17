@@ -1,0 +1,88 @@
+# 本地配置、用户数据与密钥
+.env
+.env.*
+!.env.example
+**/.config.yaml*
+**/data/
+**/tmp/
+*.db
+*.db-*
+*.sqlite*
+*.pem
+*.key
+*.log
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+
+# 编译与环境产物
+**/build/
+**/managed_components/
+**/sdkconfig
+**/sdkconfig.old
+**/.espressif/
+*.bin
+*.elf
+*.map
+*.zip
+server/config/assets/wakeup_words/5bc21988998753db0ac7895a7f6bf16d.wav
+
+# 旧版及本地素材仍保存在电脑，不进入首版仓库
+*备份*
+设备固件备份/
+攀搭报告_上传这个文件夹/
+服务端/测试结果_*/
+服务端/联调结果_*/
+服务端/攀搭改动代码/
+服务端/测试脚本/
+服务端/step_config*.yaml
+服务端/搭建步骤*.md
+服务端/检查Step接口.sh
+服务端/测试情绪语音.py
+04_*.md
+06_产品方案_详细参考稿.md
+06_参赛产品方案_排版版.html
+06_攀搭产品方案.pdf
+
+# 公共站点由脚本生成后通过 Pages 发布
+.site/
+.github-preparation/
+
+# 首次发布只保留当前说明；早期计划中的型号、模型及进度已过时
+/01_项目总览.md
+/02_功能清单.md
+/03_硬件与技术方案.md
+/05_App设计说明.md
+/服务端/
+
+# app 只发布当前交互页；报告工具含个人路径，保留在本地
+/app/*
+!/app/攀搭App.html
+
+# 只纳入现有本地验证入口实际调用的三组回归用例
+/tests/legacy/*
+!/tests/legacy/test_route_store.py
+!/tests/legacy/test_attempt_store.py
+!/tests/legacy/test_fix_store.py
+
+# 一次性的 CLI 安装工具不属于项目运行依赖
+/scripts/prepare_github_cli.py
+
+# 正式 Markdown 引用的图版均已内嵌截图；原始截图、旧图与渲染中间件留本地
+/分享图/*
+!/分享图/攀搭_攀岩类型对照.svg
+!/分享图/攀搭_抱石入门.svg
+!/分享图/攀搭_记录价值.svg
+!/分享图/主报告_镁粉与手机.svg
+!/分享图/主报告_硬件组合.svg
+!/分享图/攀搭_训练流程.svg
+!/分享图/攀搭_情绪陪伴.svg
+!/分享图/主报告_App训练.svg
+!/分享图/主报告_App成长.svg
+!/分享图/主报告_App小搭.svg
+!/分享图/主报告_App身体.svg
+!/分享图/攀搭_安全提醒.svg
+!/分享图/攀搭_系统架构.svg
+!/分享图/攀搭_Step协作.svg

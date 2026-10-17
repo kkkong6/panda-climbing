@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="t d">
+<title id="t">一分钟认识抱石</title><desc id="d">低岩壁、保护垫、岩点与示例线路。攀爬者使用手脚完成动作，不使用绳索保护。黄色示例线路连接起点与终点，粉袋用于装镁粉。</desc>
+<defs><style>text{font-family:"PingFang SC","Microsoft YaHei",sans-serif;fill:#24231f}.h{font-size:23px;font-weight:700}.b{font-size:18px}.s{font-size:16px;fill:#756f64}.lead{fill:none;stroke:#8c8578;stroke-width:2}</style>
+<g id="hold"><path d="M-20 3Q-13-15 7-12L23 3Q17 17-3 14Z" stroke="#4c473e" stroke-width="2"/><circle r="2" fill="#fff"/></g></defs>
+<rect width="1200" height="760" rx="24" fill="#f3f2ee"/>
+<text x="46" y="62" style="font-size:32px;font-weight:800">抱石：用手脚，解一道岩壁上的动作题。</text>
+<text x="46" y="99" class="s">在较低岩壁上完成短线路，不使用绳索保护，地面铺设专用保护垫。</text>
+<path d="M53 157H658L707 621H53Z" fill="#e3e0d7" stroke="#c3bdb0" stroke-width="2"/>
+<path d="M317 157L371 621M53 321L675 321M53 476L691 476" stroke="#ccc6b9" stroke-width="2"/>
+<path d="M148 553L231 463L320 404L399 320L492 265L571 208" stroke="#b99200" stroke-width="3" stroke-dasharray="8 8" fill="none"/>
+<g fill="#f7c600"><use href="#hold" x="148" y="553"/><use href="#hold" x="231" y="463"/><use href="#hold" x="320" y="404"/><use href="#hold" x="399" y="320"/><use href="#hold" x="492" y="265"/><use href="#hold" x="571" y="208"/></g>
+<g fill="#e97aa1"><use href="#hold" x="133" y="239"/><use href="#hold" x="273" y="297"/><use href="#hold" x="530" y="487"/></g>
+<g fill="#678cca"><use href="#hold" x="222" y="190"/><use href="#hold" x="592" y="365"/><use href="#hold" x="431" y="551"/></g>
+<g fill="#80a677"><use href="#hold" x="108" y="401"/><use href="#hold" x="468" y="192"/><use href="#hold" x="612" y="569"/></g>
+<rect x="70" y="569" width="89" height="31" rx="8" fill="#fff"/><text x="114" y="591" text-anchor="middle" class="s">指定起点</text>
+<rect x="496" y="166" width="103" height="27" rx="7" fill="#fff"/><text x="547" y="185" text-anchor="middle" class="s">终点岩点</text>
+<circle cx="351" cy="350" r="23" fill="#30312e"/>
+<path d="M355 381L377 444" stroke="#333530" stroke-width="35" stroke-linecap="round"/>
+<path d="M353 385L326 389L320 404M364 386L395 355L399 320M371 437L302 443L231 463M381 447L403 494L365 530" stroke="#333530" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<path d="M389 421L412 417L420 449Q405 461 397 450Z" fill="#f7c600" stroke="#37352f" stroke-width="3"/>
+<rect x="40" y="620" width="678" height="52" rx="8" fill="#8f9f9b"/>
+<path d="M270 620V672M499 620V672" stroke="#637a73" stroke-width="3"/>
+<text x="377" y="654" text-anchor="middle" style="font-size:21px;fill:#fff;font-weight:700">专用保护垫：提供落地缓冲</text>
+<path d="M594 208H750" class="lead"/>
+<text x="778" y="192" class="h">线路 ≠ 随便抓几个点</text>
+<text x="778" y="225" class="b">按颜色或标记找到指定岩点</text>
+<text x="778" y="255" class="s">图中黄色为一条示例线路</text>
+<path d="M649 328H750" class="lead"/>
+<text x="778" y="319" class="h">V3，是一个难度等级</text>
+<text x="778" y="352" class="b">V 等级数字越大通常越难</text>
+<text x="778" y="382" class="s">路线风格不同，难度体感也不同</text>
+<path d="M420 438H750" class="lead"/>
+<text x="778" y="439" class="h">粉袋，是装镁粉的袋子</text>
+<text x="778" y="472" class="b">镁粉吸汗，帮助保持手部干燥</text>
+<text x="778" y="502" class="s">攀搭磁吸在这里，落地后就能操作</text>
+<text x="778" y="559" class="h">完攀：按要求完成线路</text>
+<text x="778" y="592" class="b">一次次尝试，找到有效的动作</text>
+<text x="778" y="622" class="s">每次未完攀，也可能多解开一步</text>
+<text x="47" y="717" class="s">场景示意，非动作教学。保护垫不能消除受伤风险；遵循岩馆规则，学习正确的下撤与落地方式。</text>
+</svg>

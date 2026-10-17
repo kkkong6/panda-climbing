@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="820" viewBox="0 0 1200 820" role="img" aria-labelledby="title desc">
+  <title id="title">攀搭系统架构与数据闭环</title>
+  <desc id="desc">攀搭终端交互、陪练业务服务、训练档案与 App 构成产品架构，Step 提供理解与表达。底层硬件和开源语音框架提供运行与连接基础，产品设计重点为训练事件、情绪反馈和跨端训练闭环。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#78756e"/></marker>
+    <style>
+      text{font-family:"PingFang SC","Microsoft YaHei",sans-serif;fill:#24231f}
+      .title{font-size:30px;font-weight:700}.sub{font-size:16px;fill:#78756e}
+      .head{font-size:22px;font-weight:700}.body{font-size:17px}.small{font-size:15px;fill:#68665e}
+      .card{fill:white;stroke:#dfddd6;stroke-width:1.5}.line{fill:none;stroke:#78756e;stroke-width:2;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1200" height="820" rx="24" fill="#f3f2ee"/>
+  <rect x="40" y="36" width="9" height="45" rx="4" fill="#f7c600"/>
+  <text x="66" y="66" class="title">攀搭 · 从现场感知到个性化陪练</text>
+  <text x="66" y="98" class="sub">产品架构｜终端交互 · 训练业务 · 情绪反馈 · 跨端记忆</text>
+
+  <rect x="40" y="150" width="280" height="300" rx="20" class="card"/>
+  <rect x="60" y="170" width="94" height="28" rx="14" fill="#fff0ae"/>
+  <text x="77" y="190" class="small">随身终端</text>
+  <text x="60" y="233" class="head">攀搭终端交互</text>
+  <text x="60" y="270" class="body">尝试记录与 3 秒纠错窗口</text>
+  <text x="60" y="303" class="body">按住说话与线路状态确认</text>
+  <text x="60" y="336" class="body">运动摘要与落地事件处理</text>
+  <line x1="60" y1="356" x2="300" y2="356" stroke="#e5e3dd"/>
+  <text x="60" y="386" class="body">屏幕、声音、振动协同反馈</text>
+  <text x="60" y="420" class="small">本地规则 / 缓存 / 紧急提示</text>
+
+  <rect x="410" y="150" width="330" height="300" rx="20" class="card"/>
+  <rect x="430" y="170" width="108" height="28" rx="14" fill="#fff0ae"/>
+  <text x="446" y="190" class="small">业务与调度</text>
+  <text x="430" y="233" class="head">攀搭陪练业务服务</text>
+  <text x="430" y="270" class="body">线路、尝试、语音心得管理</text>
+  <text x="430" y="303" class="body">语气分析、回应策略与冷却</text>
+  <text x="430" y="336" class="body">历史检索、偏好与任务编排</text>
+  <line x1="430" y1="356" x2="720" y2="356" stroke="#e5e3dd"/>
+  <text x="430" y="386" class="body">规则计算统计 · 模型生成解读</text>
+  <text x="430" y="420" class="small">模型适配 / 超时降级 / App 同步</text>
+
+  <path d="M320 275H410" class="line"/>
+  <text x="365" y="255" text-anchor="middle" class="small">音频 / 事件</text>
+  <path d="M410 370H320" class="line"/>
+  <text x="365" y="399" text-anchor="middle" class="small">语音 / 确认</text>
+
+  <rect x="830" y="150" width="330" height="300" rx="20" fill="#24231f"/>
+  <text x="850" y="190" style="fill:#f7c600;font-size:22px;font-weight:700">Step 智能链路</text>
+  <text x="850" y="234" style="fill:white;font-size:18px">① ASR：听清说话内容</text>
+  <text x="850" y="266" style="fill:white;font-size:18px">② Audio Chat：分析声音情绪</text>
+  <text x="850" y="298" style="fill:#d3d0c7;font-size:15px">① ② 并行处理同一份录音</text>
+  <line x1="850" y1="316" x2="1140" y2="316" stroke="#55534e"/>
+  <text x="850" y="350" style="fill:white;font-size:18px">③ LLM：理解上下文、生成回应</text>
+  <text x="850" y="389" style="fill:white;font-size:18px">④ TTS：把回应说出合适的语气</text>
+  <text x="850" y="424" style="fill:#d3d0c7;font-size:15px">从理解内容，到理解情境与表达</text>
+  <path d="M740 275H830" class="line"/>
+  <path d="M830 370H740" class="line"/>
+  <text x="785" y="255" text-anchor="middle" class="small">模型调用</text>
+  <text x="785" y="399" text-anchor="middle" class="small">分析 / 回答</text>
+
+  <rect x="410" y="530" width="330" height="155" rx="20" class="card"/>
+  <text x="430" y="568" class="head">个人训练档案</text>
+  <text x="430" y="604" class="body">训练场次 / 线路 / 尝试 / 笔记</text>
+  <text x="430" y="637" class="body">运动摘要 / 反馈事件 / 复盘</text>
+  <text x="430" y="666" class="small">持久化记录，为长期陪伴提供依据</text>
+  <path d="M575 450V530" class="line" marker-start="url(#arrow)"/>
+  <text x="591" y="495" class="small">存储 / 检索</text>
+
+  <rect x="40" y="530" width="280" height="155" rx="20" class="card"/>
+  <text x="60" y="568" class="head">攀搭 App</text>
+  <text x="60" y="604" class="body">复盘任务 / 线路与身体状态</text>
+  <text x="60" y="637" class="body">上下文对话 / 声音与偏好</text>
+  <text x="60" y="666" class="small">记录可修正，建议回到下次训练</text>
+  <path d="M320 605H365V430H410" class="line" marker-start="url(#arrow)"/>
+
+  <rect x="830" y="530" width="330" height="155" rx="20" fill="#fff0ae"/>
+  <text x="850" y="568" class="head">基础技术支撑</text>
+  <text x="850" y="604" class="body">ESP32-S3 / IMU / 音频与振动</text>
+  <text x="850" y="637" class="body">开源语音框架 / WebSocket</text>
+  <text x="850" y="666" class="small">提供运行与连接基础，承载攀搭业务</text>
+
+  <rect x="40" y="727" width="1120" height="54" rx="16" fill="#e7e5de"/>
+  <text x="600" y="761" text-anchor="middle" style="font-size:21px;font-weight:700">记录 → 理解 → 反馈 → 复盘 → 再训练，让每次尝试成为下一次进步的起点</text>
+</svg>

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="660" viewBox="0 0 1200 660" role="img" aria-labelledby="title desc">
+<title id="title">一次训练：从啪嗒就位到复盘积累</title>
+<desc id="desc">磁吸就位、语音登记、上墙尝试、落地记录、听取反馈。用户可选择休息后再试、调整或结束训练。结束后复盘进入下一次训练。</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#817b70"/></marker>
+<style>text{font-family:"PingFang SC","Microsoft YaHei",sans-serif;fill:#24231f}.head{font-size:23px;font-weight:700}.body{font-size:18px}.small{font-size:16px;fill:#746e63}.card{fill:#fff;stroke:#dfdcd4;stroke-width:1.5}.arrow{fill:none;stroke:#817b70;stroke-width:2;marker-end:url(#a)}</style></defs>
+<rect width="1200" height="660" rx="24" fill="#f3f2ee"/>
+<text x="48" y="63" style="font-size:30px;font-weight:800">一次训练，让每次尝试都接得上</text>
+<text x="48" y="99" class="small">目标体验流程 · 上墙时专注攀爬，落地后记录与反馈</text>
+<rect x="40" y="141" width="240" height="177" rx="18" class="card"/>
+<circle cx="73" cy="177" r="17" fill="#f7c600"/><text x="73" y="183" text-anchor="middle" class="body">1</text>
+<text x="103" y="186" class="head">啪嗒，就位</text>
+<text x="60" y="234" class="body">磁吸佩戴，开机连接</text><text x="60" y="278" class="small">设备准备好，搭子在身边</text>
+<rect x="330" y="141" width="240" height="177" rx="18" class="card"/>
+<circle cx="363" cy="177" r="17" fill="#f7c600"/><text x="363" y="183" text-anchor="middle" class="body">2</text>
+<text x="393" y="186" class="head">说出线路</text>
+<text x="350" y="234" class="body">“黄色 V3，仰角。”</text><text x="350" y="278" class="small">登记线路，关联之前的心得</text>
+<rect x="620" y="141" width="240" height="177" rx="18" class="card"/>
+<circle cx="653" cy="177" r="17" fill="#f7c600"/><text x="653" y="183" text-anchor="middle" class="body">3</text>
+<text x="683" y="186" class="head">专注尝试</text>
+<text x="640" y="234" class="body">观察、上墙、调整动作</text><text x="640" y="278" class="small">上墙时不主动开口打扰</text>
+<rect x="910" y="141" width="250" height="177" rx="18" class="card"/>
+<circle cx="943" cy="177" r="17" fill="#f7c600"/><text x="943" y="183" text-anchor="middle" class="body">4</text>
+<text x="973" y="186" class="head">落地记一下</text>
+<text x="930" y="234" class="body">按键记结果，语音留心得</text><text x="930" y="278" class="small">短震确认，特别时刻再回应</text>
+<path d="M280 223H329M570 223H619M860 223H909" class="arrow"/>
+<rect x="620" y="398" width="540" height="145" rx="18" fill="#fff0ae"/>
+<text x="645" y="436" class="head">下一步，结合记录和身体感受决定</text>
+<text x="645" y="476" class="body">休息后再试 · 调整动作或换线 · 今天先结束</text>
+<text x="645" y="513" class="small">鼓励、安慰和状态提醒，都服务于合适的选择</text>
+<path d="M1035 318V397" class="arrow"/>
+<path d="M741 398V319" class="arrow"/>
+<text x="754" y="363" class="small">休息 / 调整后再试</text>
+<rect x="40" y="398" width="450" height="145" rx="18" class="card"/>
+<text x="64" y="436" class="head">收工复盘，留给下一次</text>
+<text x="64" y="476" class="body">语音听总结，手机看记录与建议</text>
+<text x="64" y="513" class="small">完攀和未完攀的尝试都进入个人训练档案</text>
+<path d="M620 470H491" class="arrow"/>
+<text x="555" y="447" text-anchor="middle" class="small">结束训练</text>
+<rect x="40" y="582" width="1120" height="44" rx="12" fill="#e7e4dc"/>
+<text x="600" y="611" text-anchor="middle" style="font-size:19px;font-weight:600">这次记下的每一步，都是下次重新出发的起点。</text>
+</svg>

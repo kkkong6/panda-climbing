@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="590" viewBox="0 0 1200 590" role="img" aria-labelledby="t d">
+<title id="t">同一句又掉了，需要不同的回应</title><desc id="d">带笑意的又掉了和带失落的又掉了有不同的支持需要。音频理解补充声音线索，模型结合上下文选择回应，情感语音传达语气。</desc>
+<style>text{font-family:"PingFang SC","Microsoft YaHei",sans-serif;fill:#24231f}.h{font-size:24px;font-weight:700}.b{font-size:21px}.s{font-size:17px;fill:#756f64}</style>
+<rect width="1200" height="590" rx="24" fill="#f3f2ee"/>
+<text x="45" y="61" style="font-size:31px;font-weight:800">听清“又掉了”，还要理解这句话的情绪。</text>
+<text x="45" y="101" class="s">同样的文字，不同的声音线索，不同的陪伴方式</text>
+<rect x="40" y="144" width="540" height="310" rx="20" fill="#fff"/>
+<rect x="620" y="144" width="540" height="310" rx="20" fill="#fff"/>
+<circle cx="98" cy="206" r="30" fill="#f7c600"/><circle cx="88" cy="200" r="3"/><circle cx="108" cy="200" r="3"/><path d="M87 211Q98 226 110 211" stroke="#24231f" stroke-width="3" fill="none"/>
+<text x="150" y="207" class="h">“哈哈，又掉了。”</text><text x="150" y="241" class="s">带笑意 · 轻松调侃</text>
+<rect x="65" y="282" width="490" height="133" rx="15" fill="#fff5cf"/>
+<text x="85" y="315" class="s">小搭 · 轻松回应</text><text x="85" y="353" class="b">“听着你还挺有劲，</text><text x="85" y="385" class="b">刚才那步有什么新发现？”</text>
+<circle cx="678" cy="206" r="30" fill="#e1ddd3"/><circle cx="668" cy="200" r="3"/><circle cx="688" cy="200" r="3"/><path d="M667 219Q678 210 690 219" stroke="#24231f" stroke-width="3" fill="none"/>
+<text x="730" y="207" class="h">“唉，又掉了……”</text><text x="730" y="241" class="s">叹气 · 低落表达</text>
+<rect x="645" y="282" width="490" height="133" rx="15" fill="#f0efea"/>
+<text x="665" y="315" class="s">小搭 · 温柔回应</text><text x="665" y="353" class="b">“有点挫败吧，先缓一缓。</text><text x="665" y="385" class="b">愿意说说刚才卡在哪吗？”</text>
+<text x="600" y="509" text-anchor="middle" class="h">声音线索 + 明确表达 + 训练上下文 → 合适的内容与语气</text>
+<text x="600" y="550" text-anchor="middle" class="s">回应示例；情绪分析提供辅助线索，用户明确表达优先。</text>
+</svg>

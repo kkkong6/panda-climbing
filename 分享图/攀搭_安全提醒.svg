@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+<title id="title">安全提醒：支持突破，也支持适时停下</title>
+<desc id="desc">三个关注节点：下一次上墙前检查训练节奏；落地后询问异常冲击；较大冲击后持续静止且无回应时，本地报警。此图表示目标设计，不代表已经验证的防伤能力。</desc>
+<style>text{font-family:"PingFang SC","Microsoft YaHei",sans-serif;fill:#24231f}.head{font-size:23px;font-weight:700}.body{font-size:18px}.small{font-size:16px;fill:#746e63}.card{fill:white;stroke:#dfdcd4;stroke-width:1.5}</style>
+<rect width="1200" height="620" rx="24" fill="#f3f2ee"/>
+<text x="48" y="64" style="font-size:31px;font-weight:800">支持你挑战，也支持你适时停下。</text>
+<text x="48" y="102" class="small">把身体状态带回训练决策，珍惜未来还能继续攀爬的每一天。</text>
+<rect x="40" y="150" width="350" height="310" rx="20" class="card"/>
+<rect x="40" y="150" width="350" height="8" rx="4" fill="#f7c600"/>
+<text x="63" y="195" class="small">01 · 训练节奏</text>
+<text x="63" y="237" class="head">下一次上墙前</text>
+<text x="63" y="280" class="body">连续休息偏短</text>
+<text x="63" y="311" class="body">表现变化与用户表达的疲惫</text>
+<line x1="63" y1="337" x2="366" y2="337" stroke="#e4e0d7"/>
+<text x="63" y="373" class="body" style="font-weight:700">提醒休息，询问身体感受</text>
+<text x="63" y="410" class="small">在落地后的交互节点提醒</text>
+<text x="63" y="437" class="small">为下一次选择留下思考空间</text>
+<rect x="425" y="150" width="350" height="310" rx="20" class="card"/>
+<rect x="425" y="150" width="350" height="8" rx="4" fill="#ee8a37"/>
+<text x="448" y="195" class="small">02 · 异常落地</text>
+<text x="448" y="237" class="head">一次落地后</text>
+<text x="448" y="280" class="body">IMU 检测到较大冲击</text>
+<text x="448" y="311" class="body">超过设定的冲击事件阈值</text>
+<line x1="448" y1="337" x2="751" y2="337" stroke="#e4e0d7"/>
+<text x="448" y="373" class="body" style="font-weight:700">“还好吗？先看看身体情况。”</text>
+<text x="448" y="410" class="small">振动、屏幕与语音引起注意</text>
+<text x="448" y="437" class="small">疼痛时建议停训并寻求医疗帮助</text>
+<rect x="810" y="150" width="350" height="310" rx="20" class="card"/>
+<rect x="810" y="150" width="350" height="8" rx="4" fill="#d85645"/>
+<text x="833" y="195" class="small">03 · 持续无回应</text>
+<text x="833" y="237" class="head">异常事件后</text>
+<text x="833" y="280" class="body">较大冲击后持续静止</text>
+<text x="833" y="311" class="body">发出询问后仍无回应</text>
+<line x1="833" y1="337" x2="1136" y2="337" stroke="#e4e0d7"/>
+<text x="833" y="373" class="body" style="font-weight:700">本地提示，随后喇叭报警</text>
+<text x="833" y="410" class="small">紧急提示不依赖网络和大模型</text>
+<text x="833" y="437" class="small">可按键取消，尝试引起周围注意</text>
+<rect x="40" y="490" width="1120" height="91" rx="15" fill="#e7e4dc"/>
+<text x="63" y="525" style="font-size:18px;font-weight:700">目标设计：规则负责事件触发，Step 负责情境化表达，设备负责本地紧急提示。</text>
+<text x="63" y="558" class="small">辅助状态提醒，不直接测量剩余体能或诊断伤情；未提醒也不代表适合继续挑战。</text>
+</svg>

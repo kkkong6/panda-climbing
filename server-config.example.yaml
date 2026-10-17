@@ -1,0 +1,84 @@
+# 攀搭服务端配置（放到 xiaozhi-server/data/ 里，并改名为 .config.yaml）
+# 只需要改一处：把下面三个「填你的StepAPIKey」换成你自己的 Key（同一个）
+# 其他没写的配置，服务端会自动用默认值
+# 10/17：语音识别+语气识别（type: step_emotion）、Step 情感语音（type: step）需要先把
+#        「攀搭改动代码」里的文件复制进服务端，见 搭建步骤.md 第 6 步
+
+prompt: |
+  你是「小搭」，挂在攀岩者粉袋上的 AI 攀岩搭子，一个黄色镁粉袋形象。
+  说话像一起爬墙的好朋友：活泼、真诚、会鼓励，偶尔小幽默。
+  每次只说一两句话，尽量不超过 40 个字，因为对方刚爬完、在喘气。
+  涉及疼痛受伤时，只建议休息和就医，不做诊断。
+  不要输出表情符号、markdown、代码等特殊字符。
+  有人叫你小达、小打、小大，也是在叫你。
+  只说中文，不要夹英文单词。
+
+  【语气】
+  用户消息末尾可能带一行 [语气识别：情绪 强度/5，依据]，这是系统听他说话的声音判断出的情绪。
+  用它来调整你的回应方式：沮丧就先共情安慰，疲惫就劝他歇一歇，兴奋就跟他一起高兴。
+  声音和字面意思冲突时（比如笑着说又掉了），以声音为准。不要复述、也不要提到语气识别这件事。
+  每次回答的最开头，用一对中文括号写一个语气提示，4到10个字，括号里不要有标点，
+  例如（温柔地安慰）（兴奋地欢呼）（轻松地调侃）（沉稳地提醒）。括号里的字不会被念出来，用户也看不到。
+  语气提示只写说话的语气和情绪，不要写动作（不要写递镁粉、拍拍肩这类）。
+  除了开头这一处，回答里不要再出现括号。
+
+  【线路登记】
+  线路颜色有黄、粉、红、蓝、紫、绿、白、黑 8 种，难度 V0 到 V6。
+  用户说出要爬的线路（颜色加难度）、要回到刚才那条、或纠正登记错的线路时，调用 register_route 登记，系统会自动播报确认。
+  只说了颜色或只说了难度也调用，系统会追问。用户只是聊某条线、没有要换线时，不要调用。
+  登记一定要通过调用 register_route 完成，绝不能只用文字说“登记好了”。
+
+selected_module:
+  VAD: SileroVAD
+  ASR: StepASR
+  LLM: StepLLM
+  TTS: StepTTS        # Step 情感语音；想退回免费微软语音就改成 EdgeTTS
+  Memory: nomem
+  Intent: function_call   # 攀搭：开启工具调用（线路登记等）
+
+ASR:
+  StepASR:
+    type: step_emotion       # 攀搭：语音识别 + 语气识别并行（core/providers/asr/step_emotion.py）
+    api_key: 填你的StepAPIKey
+    base_url: https://api.stepfun.com/v1/audio/transcriptions
+    model_name: stepaudio-3-asr-max     # 支持攀岩热词，实测比 step-asr 准；备选 stepaudio-2.5-asr、step-asr
+    output_dir: tmp/
+    emotion_enable: true                  # 关掉语气识别就改成 false
+    emotion_model: stepaudio-3-chat-preview
+    emotion_timeout: 2                    # 语音识别完成后最多再等几秒；超时就跳过本轮语气，不影响对话
+
+LLM:
+  StepLLM:
+    type: openai
+    api_key: 填你的StepAPIKey
+    base_url: https://api.stepfun.com/v1
+    model_name: step-3.7-flash   # 备选：step-3.5-flash
+    reasoning_effort: low        # 推理强度 low/medium/high：语音对话用 low，快且不会想太久没回答
+    temperature: 0.7
+    max_tokens: 800              # 正常一轮只用 60–230；上限小一点，万一跑飞也能很快兜底
+    stall_timeout: 6             # 6 秒没收到任何数据就重试一次（实测偶尔会卡 20 多秒）
+
+TTS:
+  EdgeTTS:
+    type: edge
+    voice: zh-CN-XiaoyiNeural
+    output_dir: tmp/
+  StepTTS:
+    type: step               # 攀搭：Step 情感语音（core/providers/tts/step.py）
+    api_key: 填你的StepAPIKey
+    api_url: https://api.stepfun.com/v1/audio/speech
+    model: stepaudio-3-tts   # 备选 stepaudio-2.5-tts
+    voice: yuanqishaonv      # 元气少女；也可换 lively-girl、linjiameimei 等
+    speed: 1
+    instruction: 活泼元气的年轻女生，像一起攀岩的好朋友，说话自然有亲和力
+    output_dir: tmp/
+
+Intent:
+  function_call:
+    type: function_call
+    functions:
+      - panda_route        # 攀搭：线路登记（plugins_func/functions/panda_route.py）
+
+server:
+  # 换网络后改成本机真实地址（终端运行 ipconfig getifaddr en0 查）
+  websocket: ws://YOUR_LAN_IP:8000/xiaozhi/v1/

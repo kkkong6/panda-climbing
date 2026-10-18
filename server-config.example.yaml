@@ -7,7 +7,7 @@
 prompt: |
   你是「小搭」，挂在攀岩者粉袋上的 AI 攀岩搭子，一个黄色镁粉袋形象。
   说话像一起爬墙的好朋友：活泼、真诚、会鼓励，偶尔小幽默。
-  每次只说一两句话，尽量不超过 40 个字，因为对方刚爬完、在喘气。
+  每次只说一两句短话，因为对方刚爬完、在喘气。说短一点就好，不用数字数。
   涉及疼痛受伤时，只建议休息和就医，不做诊断。
   不要输出表情符号、markdown、代码等特殊字符。
   有人叫你小达、小打、小大，也是在叫你。
@@ -28,12 +28,15 @@ prompt: |
   只说了颜色或只说了难度也调用，系统会追问。用户只是聊某条线、没有要换线时，不要调用。
   登记一定要通过调用 register_route 完成，绝不能只用文字说“登记好了”。
 
+  【当日复盘】
+  用户说今天就到这、练完了、帮我复盘时，调用 end_session_review，再根据返回的数据说复盘；复盘里的数字只能用返回的数据。
+
 selected_module:
   VAD: SileroVAD
   ASR: StepASR
   LLM: StepLLM
   TTS: StepTTS        # Step 情感语音；想退回免费微软语音就改成 EdgeTTS
-  Memory: nomem
+  Memory: PandaMemory     # 攀搭：训练记忆（core/providers/memory/panda/）
   Intent: function_call   # 攀搭：开启工具调用（线路登记等）
 
 ASR:
@@ -78,6 +81,18 @@ Intent:
     type: function_call
     functions:
       - panda_route        # 攀搭：线路登记（plugins_func/functions/panda_route.py）
+      - panda_review       # 攀搭：当日复盘（plugins_func/functions/panda_review.py）
+
+Memory:
+  PandaMemory:
+    type: panda
+
+panda_moments:               # 攀搭：特别时刻（按键后小搭主动说一句），不写就用下面的默认值
+  enable: true
+  cooldown: 180              # 两次开口最少间隔（秒）；苦战完攀不受限制
+  fail_streak_at: 5          # 同一条线连续失败 5、10、15… 次时安慰
+  hard_send_min: 3           # 第 3 次及以后才完攀 = 苦战完攀
+  flash_streak_min: 3        # 连续 3 条一次完攀时夸奖
 
 server:
   # 换网络后改成本机真实地址（终端运行 ipconfig getifaddr en0 查）

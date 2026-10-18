@@ -1112,7 +1112,10 @@ class ConnectionHandler:
             # 使用带记忆的对话
             memory_str = None
             # 仅当query非空（代表用户询问）时查询记忆
-            if self.memory is not None and query:
+            if getattr(self.memory, "panda_archive", False):
+                # 攀搭：按当前设备读训练档案（每轮都读，包括工具调用后的递归轮，数据是最新的）
+                memory_str = self.memory.archive_for(self.device_id)
+            elif self.memory is not None and query:
                 future = asyncio.run_coroutine_threadsafe(
                     self.memory.query_memory(query), self.loop
                 )

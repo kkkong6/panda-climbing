@@ -93,6 +93,13 @@ def init_db():
             );
             CREATE UNIQUE INDEX IF NOT EXISTS idx_attempts_client ON attempts(session_id, client_id);
             CREATE INDEX IF NOT EXISTS idx_attempts_route ON attempts(session_id, route_id);
+            CREATE TABLE IF NOT EXISTS reviews (
+                session_id INTEGER PRIMARY KEY REFERENCES sessions(id),
+                stats TEXT NOT NULL,
+                spoken TEXT DEFAULT '',
+                full TEXT DEFAULT '',
+                created_at TEXT NOT NULL
+            );
             CREATE INDEX IF NOT EXISTS idx_routes_dev ON routes(device_id, color, grade);
             CREATE INDEX IF NOT EXISTS idx_visits_session ON route_visits(session_id);
             """
@@ -370,6 +377,262 @@ def session_attempts(device_id):
         ).fetchall()
         return [{"id": r["id"], "result": r["result"], "time": r["created_at"],
                  "route": label(r["color"], r["grade"]) if r["color"] else None} for r in rows]
+
+
+def attempt_context(device_id, attempt_id):
+    """一次按键的上下文，给「特别时刻」判断用（特别时刻规则在 panda/moments.py）
+    返回 None 表示这条记录已不存在 / 不属于本次训练"""
+    with _lock, _db() as c:
+        session, _ = _current_session(c, device_id, create=False)
+        if not session:
+            return None
+        rows = c.execute(
+            "SELECT id, route_id, result FROM attempts WHERE session_id=? AND deleted=0 ORDER BY id",
+            (session["id"],),
+        ).fetchall()
+        idx = next((i for i, r in enumerate(rows) if r["id"] == attempt_id), None)
+        if idx is None:
+            return None
+        me = rows[idx]
+        route_id = me["route_id"]
+        same = [r for r in rows[: idx + 1] if r["route_id"] == route_id]
+        # 这条线从上次完攀之后连续失败了几次（含这一次）
+        fail_streak = 0
+        for r in reversed(same):
+            if r["result"] != "fail":
+                break
+            fail_streak += 1
+        # 连续「一次完攀」：从这次往前，每次都是完攀，而且都是那条线本次训练的第一次尝试
+        first_on_route = {}
+        for r in rows:
+            first_on_route.setdefault(r["route_id"], r["id"])
+        flash_streak = 0
+        for r in reversed(rows[: idx + 1]):
+            if r["result"] != "send" or r["route_id"] is None or first_on_route[r["route_id"]] != r["id"]:
+                break
+            flash_streak += 1
+        route = c.execute("SELECT * FROM routes WHERE id=?", (route_id,)).fetchone() if route_id else None
+        prev = {"attempts": 0, "sends": 0}
+        if route_id:
+            row = c.execute(
+                "SELECT COUNT(*) n, SUM(result='send') s FROM attempts WHERE route_id=? AND session_id<>? AND deleted=0",
+                (route_id, session["id"]),
+            ).fetchone()
+            prev = {"attempts": row["n"] or 0, "sends": row["s"] or 0}
+        return {
+            "attempt_id": attempt_id, "result": me["result"], "is_latest": idx == len(rows) - 1,
+            "route_label": label(route["color"], route["grade"]) if route else None,
+            "route_note": (route["note"] or "") if route else "",
+            "count": len(same), "fail_streak": fail_streak, "flash_streak": flash_streak,
+            "sends_today": sum(r["result"] == "send" for r in same),
+            "prev_attempts": prev["attempts"], "prev_sends": prev["sends"],
+            "session_attempts": len(rows),
+        }
+
+
+
+# ---------- 当日复盘 ----------
+def _session_stats(c, session):
+    """一次训练的统计（数字全部由规则算出，大模型只负责解读和表达）"""
+    rows = c.execute(
+        "SELECT a.id, a.route_id, a.result, a.created_at, r.color, r.grade, r.note "
+        "FROM attempts a LEFT JOIN routes r ON r.id=a.route_id "
+        "WHERE a.session_id=? AND a.deleted=0 ORDER BY a.id",
+        (session["id"],),
+    ).fetchall()
+    routes, order = {}, []
+    for r in rows:
+        key = r["route_id"]
+        if key not in routes:
+            order.append(key)
+            routes[key] = {"label": label(r["color"], r["grade"]) if r["color"] else "未知线路",
+                           "grade": r["grade"], "note": r["note"] or "", "attempts": 0, "sends": 0,
+                           "first_send_at": None, "first_ever_send": False}
+        x = routes[key]
+        x["attempts"] += 1
+        if r["result"] == "send":
+            x["sends"] += 1
+            if x["first_send_at"] is None:
+                x["first_send_at"] = x["attempts"]
+    # 以前训练都没完攀过、今天拿下的线
+    for key, x in routes.items():
+        if key and x["sends"]:
+            prev = c.execute("SELECT COUNT(*) n, SUM(result='send') s FROM attempts WHERE route_id=? AND session_id<>? AND deleted=0",
+                             (key, session["id"])).fetchone()
+            x["prev_attempts"] = prev["n"] or 0
+            x["first_ever_send"] = (prev["n"] or 0) > 0 and not (prev["s"] or 0)
+    total = len(rows)
+    sends = sum(r["result"] == "send" for r in rows)
+    sent_routes = [x for x in routes.values() if x["sends"] and x["grade"] is not None]
+    tried = [x for x in routes.values() if x["grade"] is not None]
+    start = datetime.fromisoformat(session["started_at"])
+    end = datetime.fromisoformat(rows[-1]["created_at"]) if rows else datetime.fromisoformat(session["last_active_at"])
+    return {
+        "date": start.strftime("%Y-%m-%d"),
+        "minutes": max(1, int((end - start).total_seconds() // 60)) if rows else 0,
+        "routes": [routes[k] for k in order],
+        "route_count": len(routes),
+        "attempts": total, "sends": sends,
+        "send_rate": round(sends / total * 100) if total else 0,
+        "routes_sent": len([x for x in routes.values() if x["sends"]]),
+        "flashes": [x["label"] for x in routes.values() if x["first_send_at"] == 1],
+        "hardest_send": max(sent_routes, key=lambda x: x["grade"])["label"] if sent_routes else None,
+        "hardest_tried": max(tried, key=lambda x: x["grade"])["label"] if tried else None,
+        "first_ever_sends": [x["label"] for x in routes.values() if x["first_ever_send"]],
+        "longest_battle": max(routes.values(), key=lambda x: x["attempts"])["label"] if routes else None,
+    }
+
+
+def _usual(c, device_id, before_session_id, n=5):
+    """「平时」= 之前最近 n 次有记录的训练的平均（03 文档：单次训练比平时）"""
+    rows = c.execute(
+        "SELECT s.id, COUNT(a.id) n, SUM(a.result='send') k FROM sessions s JOIN attempts a ON a.session_id=s.id AND a.deleted=0 "
+        "WHERE s.device_id=? AND s.id<? GROUP BY s.id ORDER BY s.id DESC LIMIT ?",
+        (device_id, before_session_id, n),
+    ).fetchall()
+    if not rows:
+        return None
+    return {"sessions": len(rows),
+            "attempts": round(sum(r["n"] for r in rows) / len(rows), 1),
+            "send_rate": round(sum((r["k"] or 0) / r["n"] for r in rows) / len(rows) * 100)}
+
+
+def session_summary(device_id, end=False):
+    """本次训练（或刚结束的那次）的复盘统计。end=True 时同时结束这次训练。没有训练返回 None"""
+    with _lock, _db() as c:
+        session, _ = _current_session(c, device_id, create=False)
+        if not session:
+            session = c.execute("SELECT * FROM sessions WHERE device_id=? ORDER BY id DESC LIMIT 1", (device_id,)).fetchone()
+            if not session:
+                return None
+        stats = _session_stats(c, session)
+        stats["session_id"] = session["id"]
+        stats["usual"] = _usual(c, device_id, session["id"])
+        if end and not session["ended_at"]:
+            c.execute("UPDATE sessions SET ended_at=? WHERE id=?", (_iso(_now()), session["id"]))
+        return stats
+
+
+def save_review(session_id, stats, spoken=None, full=None):
+    import json as _json
+    with _lock, _db() as c:
+        c.execute("INSERT INTO reviews(session_id, stats, created_at) VALUES (?,?,?) "
+                  "ON CONFLICT(session_id) DO UPDATE SET stats=excluded.stats",
+                  (session_id, _json.dumps(stats, ensure_ascii=False), _iso(_now())))
+        if spoken is not None:
+            c.execute("UPDATE reviews SET spoken=? WHERE session_id=?", (spoken, session_id))
+        if full is not None:
+            c.execute("UPDATE reviews SET full=? WHERE session_id=?", (full, session_id))
+
+
+def get_review(session_id):
+    with _lock, _db() as c:
+        r = c.execute("SELECT * FROM reviews WHERE session_id=?", (session_id,)).fetchone()
+        return dict(r) if r else None
+
+
+
+# ---------- 训练记忆（每次对话前交给大模型的档案） ----------
+def _date_cn(iso):
+    d = datetime.fromisoformat(iso)
+    return f"{d.month}月{d.day}日"
+
+
+def _rate(n, k):
+    return f"{round((k or 0) / n * 100)}%" if n else "-"
+
+
+def archive(device_id, now=None):
+    """整理一份简短的训练档案（纯文字，几百字以内）。只读，不改任何数据。没有任何记录返回空串"""
+    now = now or _now()
+    with _lock, _db() as c:
+        sessions = c.execute(
+            "SELECT s.*, COUNT(a.id) n, SUM(a.result='send') k FROM sessions s "
+            "LEFT JOIN attempts a ON a.session_id=s.id AND a.deleted=0 "
+            "WHERE s.device_id=? GROUP BY s.id HAVING n>0 OR s.ended_at IS NULL ORDER BY s.id DESC LIMIT 12",
+            (device_id,),
+        ).fetchall()
+        if not sessions:
+            return ""
+        cur = sessions[0]
+        active = (cur["ended_at"] is None and
+                  now - datetime.fromisoformat(cur["last_active_at"]) <= timedelta(hours=SESSION_IDLE_HOURS))
+        lines = []
+
+        # 今天（进行中的训练）
+        current_route = None
+        if active:
+            visit = _current_visit(c, cur["id"])
+            rows = c.execute(
+                "SELECT r.id, r.color, r.grade, r.note, COUNT(a.id) n, SUM(a.result='send') k FROM attempts a "
+                "LEFT JOIN routes r ON r.id=a.route_id WHERE a.session_id=? AND a.deleted=0 "
+                "GROUP BY a.route_id ORDER BY MIN(a.id)", (cur["id"],)).fetchall()
+            mins = int((now - datetime.fromisoformat(cur["started_at"])).total_seconds() // 60)
+            head = f"【今天】训练进行中，已练约{mins}分钟"
+            if visit:
+                current_route = visit["route_id"]
+                head += f"，现在在爬{label(visit['color'], visit['grade'])}{('（' + visit['note'] + '）') if visit['note'] else ''}"
+            lines.append(head + "。")
+            for r in rows:
+                name = label(r["color"], r["grade"]) if r["color"] else "未知线路"
+                seq = [x[0] for x in c.execute(
+                    "SELECT result FROM attempts WHERE session_id=? AND deleted=0 AND route_id IS ? ORDER BY id",
+                    (cur["id"], r["id"]))]
+                first = seq.index("send") + 1 if "send" in seq else None
+                how = ("一次完攀" if first == 1 else f"第{first}次完攀") if first else "还没完攀"
+                lines.append(f"- {name}：试{r['n']}次，{how}" + (f"（共完攀{r['k']}次）" if (r["k"] or 0) > 1 else ""))
+        else:
+            lines.append("【今天】还没开始训练。")
+
+        # 当前这条线以前的记录
+        if current_route:
+            hist = c.execute(
+                "SELECT s.started_at, COUNT(a.id) n, SUM(a.result='send') k FROM attempts a JOIN sessions s ON s.id=a.session_id "
+                "WHERE a.route_id=? AND a.session_id<>? AND a.deleted=0 GROUP BY s.id ORDER BY s.id",
+                (current_route, cur["id"])).fetchall()
+            if hist:
+                parts = [f"{_date_cn(h['started_at'])}试{h['n']}次{'完攀' if h['k'] else '没完攀'}" for h in hist]
+                lines.append("【这条线以前】" + "；".join(parts) + "。")
+            else:
+                lines.append("【这条线以前】没爬过，是新线。")
+
+        # 最近几次训练（不含进行中的这次）
+        past = [s for s in sessions if not (active and s["id"] == cur["id"]) and s["n"]][:5]
+        if past:
+            lines.append("【最近训练】")
+            for s in past:
+                best = c.execute(
+                    "SELECT r.color, r.grade FROM attempts a JOIN routes r ON r.id=a.route_id "
+                    "WHERE a.session_id=? AND a.result='send' AND a.deleted=0 ORDER BY r.grade DESC LIMIT 1",
+                    (s["id"],)).fetchone()
+                n_routes = c.execute("SELECT COUNT(DISTINCT route_id) FROM attempts WHERE session_id=? AND deleted=0",
+                                     (s["id"],)).fetchone()[0]
+                lines.append(f"- {_date_cn(s['started_at'])}：{n_routes}条线，试{s['n']}次，完攀率{_rate(s['n'], s['k'])}"
+                             f"{'，最难完攀' + label(best['color'], best['grade']) if best else '，没有完攀'}")
+
+            # 卡住的线：以前试过、一直没完攀、还没下架
+            stuck = c.execute(
+                "SELECT r.color, r.grade, r.note, COUNT(a.id) n, COUNT(DISTINCT a.session_id) d FROM routes r "
+                "JOIN attempts a ON a.route_id=r.id AND a.deleted=0 WHERE r.device_id=? AND r.retired_at IS NULL "
+                "GROUP BY r.id HAVING SUM(a.result='send')=0 AND n>=3 ORDER BY MAX(a.id) DESC LIMIT 3",
+                (device_id,)).fetchall()
+            if stuck:
+                lines.append("【还没拿下的线】" + "；".join(
+                    f"{label(r['color'], r['grade'])}{('（' + r['note'] + '）') if r['note'] else ''}（{r['d']}次训练共试{r['n']}次）"
+                    for r in stuck) + "。")
+
+        # 个人最好
+        best = c.execute(
+            "SELECT r.color, r.grade, MIN(a.created_at) t FROM attempts a JOIN routes r ON r.id=a.route_id "
+            "JOIN sessions s ON s.id=a.session_id WHERE s.device_id=? AND a.result='send' AND a.deleted=0 "
+            "GROUP BY r.grade ORDER BY r.grade DESC LIMIT 1", (device_id,)).fetchone()
+        total = c.execute("SELECT COUNT(*) FROM sessions s WHERE device_id=? AND EXISTS "
+                          "(SELECT 1 FROM attempts a WHERE a.session_id=s.id AND a.deleted=0)", (device_id,)).fetchone()[0]
+        tail = f"【累计】有记录的训练{total}次"
+        if best:
+            tail += f"；完攀过最难的是V{best['grade']}（第一次是{_date_cn(best['t'])}，{label(best['color'], best['grade'])}）"
+        lines.append(tail + "。")
+        return "\n".join(lines)
 
 
 init_db()

@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import threading
 import httpx
 import openai
 from openai.types import CompletionUsage
@@ -87,10 +88,12 @@ class LLMProvider(LLMProviderBase):
                 msg["content"] = ""
         return dialogue
 
-    def _apply_thinking_disabled(self, request_params: dict):
+    def _apply_thinking_disabled(self, request_params: dict, effort=...):
         """根据域名自动禁用思考模式"""
-        if self.reasoning_effort:
-            request_params.setdefault("extra_body", {})["reasoning_effort"] = self.reasoning_effort
+        # 攀搭：单次调用可传 reasoning_effort 覆盖配置；传 None = 用模型默认（low 时偶尔不按 JSON 格式输出）
+        effort = self.reasoning_effort if effort is ... else effort
+        if effort:
+            request_params.setdefault("extra_body", {})["reasoning_effort"] = effort
         parsed_url = urlparse(self.base_url)
         domain = parsed_url.netloc
         for disabled_domain, params in THINKING_DISABLED_DOMAINS.items():
@@ -100,34 +103,53 @@ class LLMProvider(LLMProviderBase):
                 break
 
     def _open_stream(self, request_params):
-        """创建流式请求；配置了 stall_timeout 时，开头卡住就重试一次。返回可迭代的 chunk 序列和 stream 对象"""
+        """创建流式请求；配置了 stall_timeout 时，开头 stall_timeout 秒还没收到第一段数据就放弃重来一次。
+        只限制「开头」：开始返回之后，中途停顿多久都不打断（之前用 httpx 读超时，会把中途停顿也当成卡住）。
+        返回可迭代的 chunk 序列和 stream 对象"""
         if not self.stall_timeout:
             stream = self.client.chat.completions.create(**request_params)
             return stream, stream
-        timeout = httpx.Timeout(connect=3.0, read=self.stall_timeout, write=5.0, pool=2.0)
-        last_err = None
+        client = self.client.with_options(max_retries=0)  # SDK 自带的重试会让每次卡顿翻 3 倍时间
         for attempt in (1, 2):
             t0 = time.time()
-            try:
-                # SDK 自带的重试会让每次卡顿翻 3 倍时间，这里关掉，由我们自己重试一次
-                stream = self.client.with_options(max_retries=0).chat.completions.create(**request_params, timeout=timeout)
-                it = iter(stream)
-                first = next(it)
+            box = {}
+            done = threading.Event()
+
+            def first_chunk():
+                try:
+                    box["stream"] = client.chat.completions.create(**request_params)
+                    box["it"] = iter(box["stream"])
+                    box["first"] = next(box["it"])
+                except StopIteration:
+                    box["empty"] = True
+                except Exception as e:
+                    box["error"] = e
+                finally:
+                    done.set()
+
+            threading.Thread(target=first_chunk, daemon=True).start()
+            if done.wait(self.stall_timeout):
+                if "error" in box:
+                    raise box["error"]
+                if box.get("empty"):
+                    box["stream"].close()
+                    return iter(()), box["stream"]
                 if attempt > 1:
                     logger.bind(tag=TAG).info(f"大模型重试成功，第 {attempt} 次，{time.time() - t0:.1f}s 收到数据")
+                it, first = box["it"], box["first"]
 
                 def chain(first=first, it=it):
                     yield first
                     yield from it
-                return chain(), stream
-            except (openai.APITimeoutError, httpx.TimeoutException) as e:
-                last_err = e
-                logger.bind(tag=TAG).warning(
-                    f"大模型 {time.time() - t0:.1f}s 没有响应（第 {attempt} 次），{'重试' if attempt == 1 else '放弃'}")
-            except StopIteration:
-                stream.close()
-                return iter(()), stream
-        raise last_err
+                return chain(), box["stream"]
+            logger.bind(tag=TAG).warning(
+                f"大模型 {self.stall_timeout:.0f}s 没开始返回（第 {attempt} 次），{'重试' if attempt == 1 else '放弃'}")
+            if "stream" in box:  # 已经连上但没出数据：关掉，后台线程会自己结束
+                try:
+                    box["stream"].close()
+                except Exception:
+                    pass
+        raise openai.APITimeoutError(request=httpx.Request("POST", self.base_url))
 
     def response(self, session_id, dialogue, **kwargs):
         dialogue = self.normalize_dialogue(dialogue)
@@ -151,29 +173,34 @@ class LLMProvider(LLMProviderBase):
                 request_params[key] = value
 
         # 禁用思考模式
-        self._apply_thinking_disabled(request_params)
+        self._apply_thinking_disabled(request_params, kwargs.get("reasoning_effort", ...))
 
-        chunks, responses = self._open_stream(request_params)
-
-        is_active = True
-        try:
-            for chunk in chunks:
-                try:
-                    delta = chunk.choices[0].delta if getattr(chunk, "choices", None) else None
-                    content = getattr(delta, "content", "") if delta else ""
-                except IndexError:
-                    content = ""
-                if content:
-                    if "<think>" in content:
-                        is_active = False
-                        content = content.split("<think>")[0]
-                    if "</think>" in content:
-                        is_active = True
-                        content = content.split("</think>")[-1]
-                    if is_active:
-                        yield content
-        finally:
-            responses.close()
+        for attempt in (1, 2):  # 攀搭：没输出内容时自动重来一次（见 response_with_functions）
+            chunks, responses = self._open_stream(request_params)
+            got = False
+            is_active = True
+            try:
+                for chunk in chunks:
+                    try:
+                        delta = chunk.choices[0].delta if getattr(chunk, "choices", None) else None
+                        content = getattr(delta, "content", "") if delta else ""
+                    except IndexError:
+                        content = ""
+                    if content:
+                        if "<think>" in content:
+                            is_active = False
+                            content = content.split("<think>")[0]
+                        if "</think>" in content:
+                            is_active = True
+                            content = content.split("</think>")[-1]
+                        if is_active and content:
+                            got = True
+                            yield content
+            finally:
+                responses.close()
+            if got:
+                return
+            logger.bind(tag=TAG).warning(f"大模型第 {attempt} 次没输出内容（只在思考）{'，重试' if attempt == 1 else ''}")
 
     def response_with_functions(self, session_id, dialogue, functions=None, **kwargs):
         dialogue = self.normalize_dialogue(dialogue)
@@ -197,7 +224,7 @@ class LLMProvider(LLMProviderBase):
                 request_params[key] = value
 
         # 禁用思考模式
-        self._apply_thinking_disabled(request_params)
+        self._apply_thinking_disabled(request_params, kwargs.get("reasoning_effort", ...))
 
         # 攀搭调试：设置环境变量 PANDA_DUMP_LLM=目录 时，把每次请求原样存下来（默认关闭）
         dump_dir = os.environ.get("PANDA_DUMP_LLM")
@@ -206,21 +233,29 @@ class LLMProvider(LLMProviderBase):
             with open(os.path.join(dump_dir, f"req_{time.time():.3f}.json"), "w", encoding="utf-8") as f:
                 json.dump(request_params, f, ensure_ascii=False, default=str)
 
-        chunks, stream = self._open_stream(request_params)
-
-        try:
-            for chunk in chunks:
-                if getattr(chunk, "choices", None):
-                    delta = chunk.choices[0].delta
-                    content = getattr(delta, "content", "")
-                    tool_calls = getattr(delta, "tool_calls", None)
-                    yield content, tool_calls
-                elif isinstance(getattr(chunk, "usage", None), CompletionUsage):
-                    usage_info = getattr(chunk, "usage", None)
-                    logger.bind(tag=TAG).info(
-                        f"Token 消耗：输入 {getattr(usage_info, 'prompt_tokens', '未知')}，"
-                        f"输出 {getattr(usage_info, 'completion_tokens', '未知')}，"
-                        f"共计 {getattr(usage_info, 'total_tokens', '未知')}"
-                    )
-        finally:
-            stream.close()
+        # 攀搭：推理模型偶尔把 token 全用在思考上、一个字没说（约 1/10）。
+        # 还没输出任何东西时自动重来一次，用户只是多等一两秒，不用再说一遍
+        for attempt in (1, 2):
+            chunks, stream = self._open_stream(request_params)
+            got = False
+            try:
+                for chunk in chunks:
+                    if getattr(chunk, "choices", None):
+                        delta = chunk.choices[0].delta
+                        content = getattr(delta, "content", "")
+                        tool_calls = getattr(delta, "tool_calls", None)
+                        if content or tool_calls:
+                            got = True
+                        yield content, tool_calls
+                    elif isinstance(getattr(chunk, "usage", None), CompletionUsage):
+                        usage_info = getattr(chunk, "usage", None)
+                        logger.bind(tag=TAG).info(
+                            f"Token 消耗：输入 {getattr(usage_info, 'prompt_tokens', '未知')}，"
+                            f"输出 {getattr(usage_info, 'completion_tokens', '未知')}，"
+                            f"共计 {getattr(usage_info, 'total_tokens', '未知')}"
+                        )
+            finally:
+                stream.close()
+            if got:
+                return
+            logger.bind(tag=TAG).warning(f"大模型第 {attempt} 次没输出内容（只在思考）{'，重试' if attempt == 1 else ''}")

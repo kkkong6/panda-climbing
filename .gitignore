@@ -86,3 +86,7 @@ server/config/assets/wakeup_words/5bc21988998753db0ac7895a7f6bf16d.wav
 !/分享图/攀搭_安全提醒.svg
 !/分享图/攀搭_系统架构.svg
 !/分享图/攀搭_Step协作.svg
+
+# 本地作图工作目录（最终版已单独放在根目录）
+Demo展示/
+宣传海报/

@@ -74,6 +74,10 @@ class SimpleHttpServer:
                         ),
                     ]
                 )
+                # 攀搭：手机 App 和它的数据接口（http://电脑IP:8003/panda/）
+                from panda.api import PandaApi
+                app.add_routes(PandaApi(self.config).routes())
+                self.logger.bind(tag=TAG).info(f"攀搭 App：http://{host if host != '0.0.0.0' else '电脑IP'}:{port}/panda/")
 
                 # 运行服务
                 runner = web.AppRunner(app)

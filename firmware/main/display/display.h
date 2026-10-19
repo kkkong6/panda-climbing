@@ -61,6 +61,8 @@ public:
     virtual void SetPandaRoute(const char* route) { (void)route; }
     // 攀搭：屏幕中间的结果图标，1 = 完攀 ✓，0 = 失败 ✗，-1 = 隐藏
     virtual void SetPandaResult(int result) { (void)result; }
+    // 攀搭：安全提醒全屏，level 0 = 隐藏，1 = 黄（重摔），2 = 红（摔后不动），3 = 暗红（闪烁的另一帧）
+    virtual void SetPandaAlert(int level, const char* title, const char* sub) { (void)level; (void)title; (void)sub; }
     virtual bool InsertAnimDialog(const char* name, uint32_t duration_ms) {
         (void)name;
         (void)duration_ms;

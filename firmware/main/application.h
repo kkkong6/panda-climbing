@@ -178,6 +178,27 @@ private:
     void PandaCountdownTick();
     void PandaShowStatus();
 
+    // 攀搭：安全提醒（固定规则，断网也能用）
+    //   重摔 → 黄屏「还好吗？」+ 长震 2 下，告诉服务端（小搭关心一句）
+    //   重摔后 30 秒几乎不动 → 红屏闪烁 + 持续震动，10 秒内没按键就放报警音（音量开到最大）
+    //   任意键取消（这次按键不算记录）
+    enum PandaAlert { kPandaAlertNone, kPandaAlertHard, kPandaAlertSos };
+    PandaAlert panda_alert_ = kPandaAlertNone;
+    esp_timer_handle_t panda_alert_timer_ = nullptr;  // 报警期间每 0.5 秒一次
+    int panda_alert_ticks_ = 0;
+    int panda_saved_volume_ = -1;
+    void PandaOnMotionEvent(const std::string& event, float a, float b);
+    bool PandaCancelAlert();
+    void PandaAlertTick();
+    void PandaStartAlertTimer();
+    // 攀搭：发一条不需要确认的事件（重摔、报警、闲置），没连上就先连
+    void PandaSendNow(const std::string& fields);
+    // 攀搭：训练中 30 分钟没按键 → 问问是不是练完了
+    esp_timer_handle_t panda_idle_timer_ = nullptr;
+    bool panda_has_attempts_ = false;
+    void PandaResetIdleTimer();
+    void PandaOnIdle();
+
 
     // Event handlers
     void HandleStateChangedEvent();

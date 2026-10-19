@@ -1058,7 +1058,8 @@ if(BOARD_TYPE STREQUAL "m5stack-stick-s3")
         m5stack__m5pm1
     )
 endif()
-if(CONFIG_BOARD_TYPE_ESP_SPOT_S3 OR CONFIG_BOARD_TYPE_ESP_SPOT_C5 OR CONFIG_BOARD_TYPE_ESP_VOCAT)
+if(CONFIG_BOARD_TYPE_ESP_SPOT_S3 OR CONFIG_BOARD_TYPE_ESP_SPOT_C5 OR CONFIG_BOARD_TYPE_ESP_VOCAT OR CONFIG_BOARD_TYPE_M5STACK_STICK_S3)
+    # 攀搭：StickS3 用这个组件里的 BMI270 初始化配置文件（驱动自己写在 boards/m5stack/stick-s3/panda_motion.cc）
     list(APPEND MAIN_PRIV_REQUIRES_EXTRA
         espressif__bmi270_sensor
     )

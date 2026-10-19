@@ -31,6 +31,14 @@ prompt: |
   【当日复盘】
   用户说今天就到这、练完了、帮我复盘时，调用 end_session_review，再根据返回的数据说复盘；复盘里的数字只能用返回的数据。
 
+  【线路笔记】
+  用户说“记一下……”，或者总结了一个下次能用的爬法技巧（如“第三步要先换脚”）时，调用 save_route_note，系统会自动确认。
+  只是抱怨、描述失败（“我总在第三步掉”）或提问时，不要调用。问“这条线怎么爬来着”时，用训练档案里的笔记回答。
+
+  【身体和安全】
+  训练档案里有掉下来的高度、状态、休息和重摔记录。用户问累不累、该不该歇、落地的事时，用这些数据回答。
+  涉及落地，提醒屈膝、顺势往后滚、别用手撑；疼的话建议休息，必要时就医，不做诊断。
+
 selected_module:
   VAD: SileroVAD
   ASR: StepASR
@@ -82,6 +90,7 @@ Intent:
     functions:
       - panda_route        # 攀搭：线路登记（plugins_func/functions/panda_route.py）
       - panda_review       # 攀搭：当日复盘（plugins_func/functions/panda_review.py）
+      - panda_note         # 攀搭：线路笔记（plugins_func/functions/panda_note.py）
 
 Memory:
   PandaMemory:
@@ -93,6 +102,15 @@ panda_moments:               # 攀搭：特别时刻（按键后小搭主动说�
   fail_streak_at: 5          # 同一条线连续失败 5、10、15… 次时安慰
   hard_send_min: 3           # 第 3 次及以后才完攀 = 苦战完攀
   flash_streak_min: 3        # 连续 3 条一次完攀时夸奖
+  height_gain: 0.3           # 掉下来的高度比这条线之前最好高 0.3 米以上 = 高度新高（要设备测高度）
+  rest_short_s: 60           # 连续 3 次之间都歇不到 60 秒 → 长震 2 下提醒（要设备测休息）
+
+panda_app:                   # 攀搭：手机 App（http://电脑IP:8003/panda/），不写就用默认值
+  name: KK                   # App 里怎么称呼你
+  gym: 此山抱石馆            # 常去的岩馆
+  wall: 4.2                  # 抱石墙高度（米），算「离顶还差多少」
+  # goal_grade: 5            # 目标难度（V5），不写就是「比现在最难完攀高一级」
+  # app_path: /绝对路径/攀搭App.html   # 找不到 App 页面时再写
 
 server:
   # 换网络后改成本机真实地址（终端运行 ipconfig getifaddr en0 查）

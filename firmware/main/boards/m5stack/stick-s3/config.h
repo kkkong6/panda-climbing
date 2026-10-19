@@ -46,6 +46,10 @@
 #define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
 #define DISPLAY_SPI_MODE        0
 
+// 攀搭：振动马达（M5Stack Unit Vibrator U059，Grove 黄线）
+#define VIBRATOR_GPIO           GPIO_NUM_9
+#define VIBRATOR_STRENGTH       50   // PWM 占空比 %，Grove 口电流有限，别超过 60
+
 // PMIC PM1 address
 #define PM1_I2C_ADDR 0x6E
 

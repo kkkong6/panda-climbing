@@ -57,6 +57,7 @@ public:
 
     virtual void SetPandaRoute(const char* route) override;
     virtual void SetPandaResult(int result) override;
+    virtual void SetPandaAlert(int level, const char* title, const char* sub) override;
 
 private:
     // 攀搭控件，第一次用到时才创建
@@ -64,6 +65,10 @@ private:
     lv_obj_t* panda_route_label_ = nullptr;
     lv_obj_t* panda_result_circle_ = nullptr;
     lv_obj_t* panda_result_icon_ = nullptr;
+    lv_obj_t* panda_alert_ = nullptr;
+    lv_obj_t* panda_alert_icon_ = nullptr;
+    lv_obj_t* panda_alert_title_ = nullptr;
+    lv_obj_t* panda_alert_sub_ = nullptr;
 };
 
 // SPI LCD display

@@ -20,6 +20,8 @@
 #include <esp_random.h>
 
 #define TAG "Application"
+// 攀搭：训练中多久没按键就问「今天结束了吗？」（分钟）
+#define PANDA_IDLE_MINUTES 30
 
 Application::Application() : notify_player_(audio_service_) {
     event_group_ = xEventGroupCreate();
@@ -56,6 +58,12 @@ Application::~Application() {
     if (panda_fix_timer_ != nullptr) {
         esp_timer_stop(panda_fix_timer_);
         esp_timer_delete(panda_fix_timer_);
+    }
+    for (auto t : {panda_alert_timer_, panda_idle_timer_}) {
+        if (t != nullptr) {
+            esp_timer_stop(t);
+            esp_timer_delete(t);
+        }
     }
     vEventGroupDelete(event_group_);
 }
@@ -104,6 +112,12 @@ void Application::Initialize() {
 
     // Start the clock timer to update the status bar
     esp_timer_start_periodic(clock_timer_handle_, 1000000);
+
+    // 攀搭：运动事件（重摔 / 摔后不动）从 IMU 任务回调，切到主任务处理
+    board.PandaSetMotionCallback([this](const char* event, float a, float b) {
+        std::string e = event;
+        Schedule([this, e, a, b]() { PandaOnMotionEvent(e, a, b); });
+    });
 
     // Add MCP common tools (only once during initialization)
     auto& mcp_server = McpServer::GetInstance();
@@ -362,6 +376,7 @@ void Application::HandleActivationDoneEvent() {
         Schedule([this]() {
             // Play the success sound to indicate the device is ready
             audio_service_.PlaySound(Lang::Sounds::OGG_SUCCESS);
+            Board::GetInstance().PandaVibrate("short1");  // 攀搭：准备好了，短震 1 下
         });
     }
 }
@@ -1397,6 +1412,10 @@ void Application::ResetProtocol() {
 // ======================= 攀搭：按键记录 =======================
 void Application::PandaRecordAttempt(bool success) {
     Schedule([this, success]() {
+        // 正在安全提醒：这次按键 = 「我没事」，取消提醒，不算记录
+        if (PandaCancelAlert()) {
+            return;
+        }
         // 小搭正在说话：按键照常记录，并打断语音
         if (GetDeviceState() == kDeviceStateSpeaking) {
             AbortSpeaking(kAbortReasonNone);
@@ -1429,11 +1448,18 @@ void Application::PandaRecordAttempt(bool success) {
             snprintf(id, sizeof(id), "%06lx-%lu", (unsigned long)panda_boot_id_, (unsigned long)++panda_seq_);
             std::string fields = std::string("\"event\":\"attempt\",\"result\":\"") + result +
                                  "\",\"id\":\"" + id + "\"";
+            // 这次尝试的运动数据（下落高度、冲击、攀爬 / 休息时长…），没有 IMU 或没测到就不带
+            std::string motion = Board::GetInstance().PandaTakeMotion();
+            if (!motion.empty()) {
+                fields += ",\"motion\":{" + motion + "}";
+            }
             ESP_LOGI(TAG, "Panda attempt %s id=%s", success ? "SEND" : "FAIL", id);
             panda_pending_.push_back({id, fields, false});
             panda_fix_id_ = id;
             panda_status_text_ = success ? "完攀！记录中…" : "失败，记录中…";
         }
+        panda_has_attempts_ = true;
+        PandaResetIdleTimer();
         while (panda_pending_.size() > 200) {  // 防止断网太久占满内存
             panda_pending_.pop_front();
         }
@@ -1459,6 +1485,8 @@ void Application::PandaRecordAttempt(bool success) {
 
         // 提示音：完攀是上扬的 success，失败是短促的 popup，爬墙上不看屏幕也知道按对了
         audio_service_.PlaySound(success ? Lang::Sounds::OGG_SUCCESS : Lang::Sounds::OGG_POPUP);
+        // 震动：完攀短震 2 下，失败短震 1 下（改按也按新结果震）
+        Board::GetInstance().PandaVibrate(success ? "short2" : "short1");
 
         PandaFlush();
     });
@@ -1531,6 +1559,14 @@ void Application::PandaHandleAck(const cJSON* root) {
             panda_route_ = route->valuestring;
             ESP_LOGI(TAG, "Panda route: %s", panda_route_.c_str());
             Board::GetInstance().GetDisplay()->SetPandaRoute(panda_route_.c_str());
+            PandaResetIdleTimer();
+        }
+        return;
+    }
+    if (strcmp(event->valuestring, "vibrate") == 0) {
+        auto pattern = cJSON_GetObjectItem(root, "pattern");
+        if (cJSON_IsString(pattern)) {
+            Board::GetInstance().PandaVibrate(pattern->valuestring);
         }
         return;
     }
@@ -1572,4 +1608,164 @@ void Application::PandaHandleAck(const cJSON* root) {
             PandaShowStatus();
         }
     }
+}
+
+// ======================= 攀搭：安全提醒 + 闲置提醒 =======================
+void Application::PandaOnMotionEvent(const std::string& event, float a, float b) {
+    auto display = Board::GetInstance().GetDisplay();
+    if (event == "hard_fall") {
+        if (panda_alert_ == kPandaAlertSos) {
+            return;  // 已经在报警
+        }
+        ESP_LOGW(TAG, "Panda hard fall: %.1fg %.2fm", a, b);
+        if (GetDeviceState() == kDeviceStateSpeaking) {
+            AbortSpeaking(kAbortReasonNone);
+        }
+        panda_alert_ = kPandaAlertHard;
+        panda_alert_ticks_ = 0;
+        display->SetPandaAlert(1, "还好吗？", "按任意键 = 没事");
+        Board::GetInstance().PandaVibrate("long2");  // 长震 2 下：注意安全
+        PandaStartAlertTimer();
+        char fields[96];
+        snprintf(fields, sizeof(fields), "\"event\":\"fall\",\"impact_g\":%.1f,\"fall_m\":%.2f", a, b);
+        PandaSendNow(fields);  // 服务端记录并让小搭关心一句（结合历史：这周第几次、什么线）
+    } else if (event == "still") {
+        ESP_LOGW(TAG, "Panda still %.0fs after hard fall -> SOS", a);
+        if (GetDeviceState() == kDeviceStateSpeaking) {
+            AbortSpeaking(kAbortReasonNone);
+        }
+        panda_alert_ = kPandaAlertSos;
+        panda_alert_ticks_ = 0;
+        display->SetPandaAlert(2, "摔后没动", "按任意键取消");
+        Board::GetInstance().PandaVibrate("sos");  // 持续震动，直到取消
+        audio_service_.PlaySound(Lang::Sounds::OGG_EXCLAMATION);  // 先「问」一声
+        PandaStartAlertTimer();
+        PandaSendNow("\"event\":\"sos\"");
+    }
+}
+
+void Application::PandaStartAlertTimer() {
+    if (panda_alert_timer_ == nullptr) {
+        esp_timer_create_args_t args = {.callback =
+                                            [](void* arg) {
+                                                Application* app = (Application*)arg;
+                                                app->Schedule([app]() { app->PandaAlertTick(); });
+                                            },
+                                        .arg = this,
+                                        .dispatch_method = ESP_TIMER_TASK,
+                                        .name = "panda_alert",
+                                        .skip_unhandled_events = true};
+        esp_timer_create(&args, &panda_alert_timer_);
+    }
+    esp_timer_stop(panda_alert_timer_);
+    esp_timer_start_periodic(panda_alert_timer_, 500 * 1000);
+}
+
+void Application::PandaAlertTick() {
+    auto display = Board::GetInstance().GetDisplay();
+    panda_alert_ticks_++;
+    if (panda_alert_ == kPandaAlertHard) {
+        // 黄屏留 20 秒；之后设备继续在后台盯着动不动（30 秒不动会转成报警）
+        if (panda_alert_ticks_ >= 40) {
+            panda_alert_ = kPandaAlertNone;
+            esp_timer_stop(panda_alert_timer_);
+            display->SetPandaAlert(0, nullptr, nullptr);
+        }
+        return;
+    }
+    if (panda_alert_ != kPandaAlertSos) {
+        esp_timer_stop(panda_alert_timer_);
+        return;
+    }
+    // 红屏闪烁
+    display->SetPandaAlert(panda_alert_ticks_ % 2 ? 3 : 2, "摔后没动", "按任意键取消");
+    // 先询问 10 秒（震动 + 闪屏），没回应就放报警音，每 1.5 秒一次，音量开到最大
+    if (panda_alert_ticks_ >= 20 && panda_alert_ticks_ % 3 == 0) {
+        auto codec = Board::GetInstance().GetAudioCodec();
+        if (panda_saved_volume_ < 0 && codec) {
+            panda_saved_volume_ = codec->output_volume();
+            codec->SetOutputVolume(100);
+        }
+        audio_service_.PlaySound(Lang::Sounds::OGG_EXCLAMATION);
+    }
+}
+
+bool Application::PandaCancelAlert() {
+    if (panda_alert_ == kPandaAlertNone) {
+        return false;
+    }
+    bool was_sos = panda_alert_ == kPandaAlertSos;
+    panda_alert_ = kPandaAlertNone;
+    if (panda_alert_timer_) {
+        esp_timer_stop(panda_alert_timer_);
+    }
+    auto& board = Board::GetInstance();
+    board.PandaVibrate("stop");
+    if (panda_saved_volume_ >= 0) {
+        board.GetAudioCodec()->SetOutputVolume(panda_saved_volume_);
+        panda_saved_volume_ = -1;
+    }
+    board.GetDisplay()->SetPandaAlert(0, nullptr, nullptr);
+    board.GetDisplay()->SetChatMessage("system", "好的，没事就好");
+    board.PandaVibrate("short1");
+    if (was_sos) {
+        PandaSendNow("\"event\":\"sos_cancel\"");
+    }
+    ESP_LOGI(TAG, "Panda alert cancelled by button");
+    return true;
+}
+
+void Application::PandaSendNow(const std::string& fields) {
+    if (!protocol_) {
+        return;
+    }
+    if (!protocol_->IsAudioChannelOpened()) {
+        if (GetDeviceState() != kDeviceStateIdle) {
+            return;  // 正在连接 / 配网：这条不重要到要重发，报警本身在设备上
+        }
+        SetDeviceState(kDeviceStateConnecting);
+        bool opened = protocol_->OpenAudioChannel();
+        if (GetDeviceState() == kDeviceStateConnecting) {
+            SetDeviceState(kDeviceStateIdle);
+        }
+        if (!opened) {
+            ESP_LOGW(TAG, "Panda event not sent (offline): %s", fields.c_str());
+            return;
+        }
+    }
+    protocol_->SendPandaEvent(fields);
+}
+
+void Application::PandaResetIdleTimer() {
+    if (panda_idle_timer_ == nullptr) {
+        esp_timer_create_args_t args = {.callback =
+                                            [](void* arg) {
+                                                Application* app = (Application*)arg;
+                                                app->Schedule([app]() { app->PandaOnIdle(); });
+                                            },
+                                        .arg = this,
+                                        .dispatch_method = ESP_TIMER_TASK,
+                                        .name = "panda_idle",
+                                        .skip_unhandled_events = true};
+        esp_timer_create(&args, &panda_idle_timer_);
+    }
+    esp_timer_stop(panda_idle_timer_);
+    esp_timer_start_once(panda_idle_timer_, (uint64_t)PANDA_IDLE_MINUTES * 60 * 1000 * 1000);
+}
+
+void Application::PandaOnIdle() {
+    if (!panda_has_attempts_ || panda_alert_ != kPandaAlertNone) {
+        return;
+    }
+    auto state = GetDeviceState();
+    if (state != kDeviceStateIdle && state != kDeviceStateSpeaking) {
+        PandaResetIdleTimer();  // 正在说话 / 听：过会儿再问
+        return;
+    }
+    ESP_LOGI(TAG, "Panda idle %d min, ask if finished", PANDA_IDLE_MINUTES);
+    Board::GetInstance().GetDisplay()->SetChatMessage("system", "今天结束了吗？");
+    char fields[48];
+    snprintf(fields, sizeof(fields), "\"event\":\"idle\",\"minutes\":%d", PANDA_IDLE_MINUTES);
+    PandaSendNow(fields);  // 服务端确认今天有记录、训练没结束，才让小搭开口（长震 1 下 + 一句话）
+    // 只问一次；下次按键后重新计时
 }

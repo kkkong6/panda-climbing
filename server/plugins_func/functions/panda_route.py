@@ -25,7 +25,7 @@ register_route_desc = {
             "或者说要回到之前那条线（“回到刚才那条”“还是爬上一条”），或者纠正刚才登记错的线路（“不对，是蓝色V3”），就调用。"
             "语音识别常把 V 听成“微”“威”“为”“维”，例如“黄色微三”就是黄色V3。"
             "不要调用的情况：用户在吐槽、提问、描述自己怎么爬某条线（如“这条黄色V3好难”“我总在第三步掉”），"
-            "这时他没有要换线，应直接回答他。"
+            "这时他没有要换线，应直接回答他。用户在说爬法心得（“记一下第三步要换脚”）时用 save_route_note，不要调用本工具。"
         ),
         "parameters": {
             "type": "object",
@@ -124,7 +124,22 @@ def build_reply(r, correction=False):
         tail = f"刚才{r['adopted']}次也记到这条了。" + tail
     elif correction and r.get("moved"):
         tail = f"刚才{r['moved']}次也改过来了。"
+    tip = note_reminder(r)
+    if tip and not r.get("already_current"):
+        tail += tip
     return f"{CUE}{head}{body}{tail}"
+
+
+def note_reminder(r):
+    """登记同一条线时提醒以前记的笔记：优先用整理好的攻略，太长就用最近一条原话"""
+    guide, last = (r.get("guide") or "").strip(), (r.get("last_tip") or "").strip()
+    text = guide if guide and len(guide) <= 30 else last
+    if not text:
+        return ""
+    if len(text) > 30:
+        text = text[:30] + "…"
+    when = _date_cn(r.get("last_tip_date")) if text == last and r.get("last_tip_date") else ""
+    return f"提醒一下，你{when or '之前'}记了：{text}。"
 
 
 @register_function("register_route", register_route_desc, ToolType.SYSTEM_CTL)

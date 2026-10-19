@@ -49,11 +49,26 @@ def facts_text(st):
                 how += f"（之前几次训练试了{r['prev_attempts']}次都没拿下，今天第一次拿下）"
         else:
             how = "没完攀"
+            if r.get("best_fall"):
+                how += f"，最高掉在{r['best_fall']:.1f}米"
         lines.append(f"- {r['label']}{('（' + r['note'] + '）') if r['note'] else ''}：试了{r['attempts']}次，{how}")
     if st["hardest_send"]:
         lines.append(f"今天完攀的最难的线：{st['hardest_send']}。")
     if st["hardest_tried"] and st["hardest_tried"] != st["hardest_send"]:
         lines.append(f"尝试过的最难的线：{st['hardest_tried']}。")
+    m = st.get("motion")
+    if m:
+        part = [f"落地冲击：轻{m['impact']['轻']}次、中{m['impact']['中']}次、重{m['impact']['重']}次"]
+        if m["hard_falls"]:
+            part.append(f"重摔{m['hard_falls']}次")
+        if m.get("avg_rest_s"):
+            part.append(f"平均每次歇{m['avg_rest_s'] // 60}分{m['avg_rest_s'] % 60}秒")
+        if m.get("short_rests"):
+            part.append(f"有{m['short_rests']}次歇了不到1分钟")
+        lines.append("身体数据：" + "，".join(part) + "。")
+    cond = st.get("condition") or {}
+    if cond.get("tired"):
+        lines.append("后程状态：" + "；".join(cond["signals"]) + "，看得出累了。")
     u = st.get("usual")
     if u:
         lines.append(f"平时（之前{u['sessions']}次训练平均）：每次尝试{u['attempts']}次，完攀率{u['send_rate']}%。")

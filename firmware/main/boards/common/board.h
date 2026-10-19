@@ -68,6 +68,12 @@ public:
     virtual std::string GetBoardType() = 0;
     virtual std::string GetUuid() { return uuid_; }
     virtual Backlight* GetBacklight() { return nullptr; }
+    // 攀搭：震动（pattern：short1/short2/long1/triple/long2/sos/stop），没有马达的板子什么都不做
+    virtual bool PandaVibrate(const std::string& pattern) { (void)pattern; return false; }
+    // 攀搭：运动数据。按键记录一次尝试时取这次的运动字段（JSON 片段，没有 IMU / 没测到返回空串）
+    virtual std::string PandaTakeMotion() { return ""; }
+    // 攀搭：运动事件回调（"hard_fall" 冲击g 下落米 / "still" 不动秒数），在 IMU 任务里调用
+    virtual void PandaSetMotionCallback(std::function<void(const char* event, float a, float b)> cb) { (void)cb; }
     virtual Led* GetLed();
     virtual AudioCodec* GetAudioCodec() = 0;
     virtual bool GetTemperature(float& esp32temp);

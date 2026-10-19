@@ -18,6 +18,8 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include "M5PM1.h"
+#include "panda_vibrator.h"
+#include "panda_motion.h"
 
 #define TAG "M5StackStickS3"
 
@@ -62,6 +64,8 @@ private:
     i2c_master_bus_handle_t i2c_bus_;
     M5PM1* pmic_;
     bool ptt_active_ = false;  // 正在按住说话
+    PandaVibrator* vibrator_ = nullptr;
+    PandaMotion* motion_ = nullptr;
 
     void InitializeI2c() {
         // Initialize I2C peripheral (SYS_I2C/I2C0)
@@ -204,6 +208,47 @@ public:
         InitializeLcdDisplay();
         InitializeButtons();
         GetBacklight()->SetBrightness(60);
+        InitializeVibrator();
+        InitializeMotion();
+    }
+
+    // 攀搭：内置 BMI270 算运动数据；初始化失败也不影响其他功能
+    void InitializeMotion() {
+        motion_ = new PandaMotion(i2c_bus_);
+        if (!motion_->Start()) {
+            ESP_LOGW(TAG, "IMU not available, attempts will be recorded without motion data");
+        }
+    }
+
+    virtual std::string PandaTakeMotion() override {
+        return motion_ ? motion_->TakeAttempt() : "";
+    }
+
+    virtual void PandaSetMotionCallback(std::function<void(const char*, float, float)> cb) override {
+        if (motion_) {
+            motion_->SetCallback(std::move(cb));
+        }
+    }
+
+    // 攀搭：振动马达接 Grove 口（黄线 G9），5V 由 PM1 升压提供，只在震动时打开
+    void InitializeVibrator() {
+        vibrator_ = new PandaVibrator(VIBRATOR_GPIO, [this](bool on) {
+            if (pmic_) {
+                pmic_->setBoostEnable(on);
+            }
+        }, VIBRATOR_STRENGTH);
+        vibrator_->Play("short1");  // 开机自检：插着马达就会轻震一下，不依赖网络
+    }
+
+    virtual bool PandaVibrate(const std::string& pattern) override {
+        if (!vibrator_) {
+            return false;
+        }
+        if (pattern == "stop") {
+            vibrator_->Stop();
+            return true;
+        }
+        return vibrator_->Play(pattern);
     }
 
     virtual AudioCodec* GetAudioCodec() override {

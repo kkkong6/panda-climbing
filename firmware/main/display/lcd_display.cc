@@ -1483,3 +1483,58 @@ void LcdDisplay::SetPandaResult(int result) {
     lv_obj_remove_flag(panda_result_circle_, LV_OBJ_FLAG_HIDDEN);
     lv_obj_move_foreground(panda_result_circle_);
 }
+
+// ======================= 攀搭：安全提醒全屏 =======================
+void LcdDisplay::SetPandaAlert(int level, const char* title, const char* sub) {
+    DisplayLockGuard lock(this);
+    if (!setup_ui_called_) {
+        return;
+    }
+    if (panda_alert_ == nullptr) {
+        if (level <= 0) {
+            return;
+        }
+        auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
+        panda_alert_ = lv_obj_create(lv_screen_active());
+        lv_obj_set_size(panda_alert_, LV_PCT(100), LV_PCT(100));
+        lv_obj_align(panda_alert_, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_set_style_radius(panda_alert_, 0, 0);
+        lv_obj_set_style_border_width(panda_alert_, 0, 0);
+        lv_obj_set_style_pad_all(panda_alert_, 6, 0);
+        lv_obj_set_scrollbar_mode(panda_alert_, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_remove_flag(panda_alert_, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_flex_flow(panda_alert_, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(panda_alert_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_row(panda_alert_, 8, 0);
+        panda_alert_icon_ = lv_label_create(panda_alert_);
+        lv_obj_set_style_text_font(panda_alert_icon_, lvgl_theme->large_icon_font()->font(), 0);
+        lv_label_set_text(panda_alert_icon_, MATERIAL_SYMBOLS_WARNING);
+        panda_alert_title_ = lv_label_create(panda_alert_);
+        lv_obj_set_style_text_font(panda_alert_title_, lvgl_theme->text_font()->font(), 0);
+        panda_alert_sub_ = lv_label_create(panda_alert_);
+        lv_obj_set_style_text_font(panda_alert_sub_, lvgl_theme->text_font()->font(), 0);
+        lv_obj_set_width(panda_alert_sub_, LV_PCT(100));
+        lv_label_set_long_mode(panda_alert_sub_, LV_LABEL_LONG_WRAP);
+        lv_obj_set_style_text_align(panda_alert_sub_, LV_TEXT_ALIGN_CENTER, 0);
+    }
+    if (level <= 0) {
+        lv_obj_add_flag(panda_alert_, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+    // 黄 = 留意（重摔），红 = 危险（摔后不动）；和 App 的状态色一致
+    uint32_t bg = level == 1 ? 0xF0B400 : (level == 2 ? 0xDD3A2E : 0x6E1D17);
+    uint32_t fg = level == 1 ? 0x000000 : 0xFFFFFF;
+    lv_obj_set_style_bg_color(panda_alert_, lv_color_hex(bg), 0);
+    lv_obj_set_style_bg_opa(panda_alert_, LV_OPA_COVER, 0);
+    for (auto obj : {panda_alert_icon_, panda_alert_title_, panda_alert_sub_}) {
+        lv_obj_set_style_text_color(obj, lv_color_hex(fg), 0);
+    }
+    if (title) {
+        lv_label_set_text(panda_alert_title_, title);
+    }
+    if (sub) {
+        lv_label_set_text(panda_alert_sub_, sub);
+    }
+    lv_obj_remove_flag(panda_alert_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(panda_alert_);
+}

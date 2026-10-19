@@ -2,7 +2,7 @@
 运行：python tests/run_all.py
   1. 存储回归（线路登记 / 按键 / 改按，3 组）
   2. 新功能（线路笔记、运动数据、安全提醒、状态判断、旧库补列）
-  3. App 数据与接口
+  3. App 数据与接口、音色复刻（登记 + 接口，不调用 Step）
   4. 固件运动算法（电脑上编译模拟）
   5. App 端到端（无头 Chrome 点一遍）
 """
@@ -24,6 +24,8 @@ ok = [
     run("存储回归", "tests/run_store_checks.py"),
     run("新功能", "tests/test_new_features.py"),
     run("App 数据与接口", "tests/test_appdata.py"),
+    run("音色复刻（登记）", "tests/test_voices.py"),
+    run("音色复刻（接口）", "tests/test_voices_api.py"),
     run("固件运动算法", "tests/firmware_motion/run.py"),
 ]
 app = subprocess.run(["bash", str(ROOT / "tests/app_e2e/run.sh")], cwd=ROOT, env={**os.environ, "PY": PY})

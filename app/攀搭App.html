@@ -1333,6 +1333,8 @@ function renderRec(){
               <button class="rec-redo" data-v="rerec">重录</button>`
              : `<div class="vo-bars${rec?' live':''}">${Array.from({length:28},(_,k)=>`<i style="height:${rec?6+((k*37)%22):5}px"></i>`).join('')}</div><button class="vo-rec${rec?' live':''}" data-v="rec" aria-label="${rec?'停止':'开始录音'}">${rec?'<i class="sq"></i>':'<i class="dot"></i>'}</button><span class="vo-time num" id="recTime">${rec?Math.floor(vRec)+' / 10 秒':'点一下开始，最长 10 秒'}</span><small class="vo-hint${vShort&&!rec?' warn':''}">${rec?'读完了就再点一下结束':vShort?'太短了，至少要录 5 秒，再试一次':''}</small>`}
     </div>
+    ${LIVE && !done ? `<button class="more" data-v="pick-file" style="margin-top:8px">或者选一段手机里现成的录音（5–10 秒）</button>
+      <input type="file" id="voiceFile" accept="audio/*" hidden>` : ''}
     ${done ? `<input id="vName" class="vo-input" maxlength="8" placeholder="给这个声音起个名字，比如：小然" value="${vName}">
       <label class="rec-agree"><input type="checkbox" id="vAgree" ${vAgree?'checked':''}> 声音的主人已同意，录音只用来让小搭和你说话</label>
       <button class="primary" data-v="save" ${vName.trim()&&vAgree?'':'disabled'}>保存</button>` : ''}`;
@@ -1342,29 +1344,115 @@ function openAct(title,btns){ $('#actTitle').innerHTML=title; $('#actBtns').inne
 function voiceClick(t){
   const b=t.closest('[data-v]'); if(!b) return false;
   const a=b.dataset.v, id=b.dataset.id;
-  if(a==='pick'){ voiceSel=id; const v=voices.find(x=>x.id===id); rerenderMe(); toast('▶', v.status==='cloning'?`「${v.name}」还在复刻，好了会提醒你`:`${v.name}：“比上次高了半米，再来一把！”`,'var(--pine)'); return true; }
+  if(a==='pick'){
+    const v=voices.find(x=>x.id===id);
+    if(LIVE){ if(id===voiceSel) liveVoicePick(v); else liveVoiceSelect(v); return true; }
+    voiceSel=id; rerenderMe(); toast('▶', v.status==='cloning'?`「${v.name}」还在复刻，好了会提醒你`:`${v.name}：“比上次高了半米，再来一把！”`,'var(--pine)'); return true; }
   if(a==='more'){ const v=voices.find(x=>x.id===id); vEditId=id; openAct(`<b>${v.name}</b><small>${v.date} 录制</small>`,`<button data-v="rename">修改名字</button><button data-v="del-ask" class="danger">删除这个声音</button>`); return true; }
   if(a==='act-cancel'){ $('#actSheet').hidden=true; return true; }
   if(a==='rename'){ $('#actSheet').hidden=true; vRenaming=vEditId; rerenderMe(); const el=$('#vRename'); el&&el.focus(); el&&el.select(); return true; }
-  if(a==='rename-ok'){ const v=voices.find(x=>x.id===vRenaming), nv=($('#vRename').value||'').trim(); if(nv) v.name=nv; vRenaming=null; rerenderMe(); return true; }
+  if(a==='rename-ok'){ const v=voices.find(x=>x.id===vRenaming), nv=($('#vRename').value||'').trim();
+    if(LIVE && nv){ const who=v; vRenaming=null; api('/panda/api/voices/rename', {id:who.id, name:nv}).then(d=>{ if(!d.ok) throw new Error(d.reason||''); voices=d.voices; voiceSel=d.current; rerenderMe(); toast('✓','改好了','var(--pine)'); }).catch(e=>toast('!',e.message||'没改成','var(--warn)')); return true; }
+    if(nv) v.name=nv; vRenaming=null; rerenderMe(); return true; }
   if(a==='del-ask'){ const v=voices.find(x=>x.id===vEditId); openAct(`<b>删除「${v.name}」？</b><small>录音会一起删掉，不能恢复</small>`,`<button data-v="del" class="danger">删除</button>`); return true; }
-  if(a==='del'){ const v=voices.find(x=>x.id===vEditId); voices=voices.filter(x=>x.id!==vEditId); if(voiceSel===vEditId) voiceSel='buddy'; $('#actSheet').hidden=true; rerenderMe(); toast('✓',`已删除「${v.name}」${voiceSel==='buddy'?'，换回小搭原声':''}`,'var(--pine)'); return true; }
+  if(a==='del'){ const v=voices.find(x=>x.id===vEditId); $('#actSheet').hidden=true;
+    if(LIVE){ api('/panda/api/voices/delete', {id:v.id}).then(d=>{ if(!d.ok) throw new Error(d.reason||''); voices=d.voices; voiceSel=d.current; rerenderMe(); toast('✓',`已删除「${v.name}」`,'var(--pine)'); }).catch(e=>toast('!',e.message||'没删成','var(--warn)')); return true; }
+    voices=voices.filter(x=>x.id!==vEditId); if(voiceSel===vEditId) voiceSel='buddy'; rerenderMe(); toast('✓',`已删除「${v.name}」${voiceSel==='buddy'?'，换回小搭原声':''}`,'var(--pine)'); return true; }
   if(a==='add'){ openRec(); return true; }
-  if(a==='rec-close'){ clearInterval(vRecTimer); vRecTimer=null; $('#recSheet').hidden=true; return true; }
+  if(a==='rec-close'){ clearInterval(vRecTimer); vRecTimer=null; if(recorder && recorder.state!=='inactive') liveMicStop(); $('#recSheet').hidden=true; return true; }
   if(a==='rec'){
-    if(vRecTimer){ clearInterval(vRecTimer); vRecTimer=null; if(vRec>=5){ vDone=true; vShort=false; } else { vShort=true; vRec=0; } renderRec(); return true; }
-    vRec=0; vDone=false; vShort=false;
-    vRecTimer=setInterval(()=>{ vRec=Math.min(10,vRec+0.1); const el=$('#recTime'); if(el) el.textContent=Math.floor(vRec)+' / 10 秒';
+    if(vRecTimer){
+      clearInterval(vRecTimer); vRecTimer=null;
+      if(vRec>=5){ vDone=true; vShort=false; } else { vShort=true; vRec=0; }
+      renderRec();
+      if(LIVE && vDone) liveMicStop();
+      return true; }
+    vRec=0; vDone=false; vShort=false; lastBlob=null;
+    if(LIVE) liveMicStart().then(ok=>{ if(!ok){ renderRec(); return; }
+      vRecTimer=setInterval(()=>{ vRec=Math.min(10,vRec+0.1); const el=$('#recTime'); if(el) el.textContent=Math.floor(vRec)+' / 10 秒';
+        if(vRec>=10){ clearInterval(vRecTimer); vRecTimer=null; vDone=true; renderRec(); liveMicStop(); } },100);
+      renderRec(); });
+    else vRecTimer=setInterval(()=>{ vRec=Math.min(10,vRec+0.1); const el=$('#recTime'); if(el) el.textContent=Math.floor(vRec)+' / 10 秒';
       if(vRec>=10){ clearInterval(vRecTimer); vRecTimer=null; vDone=true; renderRec(); } },100);
     renderRec(); return true; }
   if(a==='rerec'){ vRec=0; vDone=false; vShort=false; renderRec(); return true; }
-  if(a==='rec-play'){ toast('▶','回放刚才的录音','var(--pine)'); return true; }
-  if(a==='save'){ if(b.disabled) return true; const nv={id:'v'+Date.now(), name:vName.trim(), date:'10/7', status:'cloning'}; voices.push(nv); voiceSel=nv.id; $('#recSheet').hidden=true; rerenderMe(); toast('…',`正在复刻「${nv.name}」的声音，大约 10 秒`,'var(--pine)');
-    setTimeout(()=>{ nv.status='ready'; if(!$('#recSheet').hidden) return; rerenderMe(); toast('✓',`「${nv.name}」的声音好了，小搭现在用它和你说话`,'var(--pine)'); },2600); return true; }
+  if(a==='pick-file'){ const inp=$('#voiceFile'); inp && inp.click(); return true; }
+  if(a==='rec-play'){ if(LIVE && lastBlob){ new Audio(URL.createObjectURL(lastBlob)).play().catch(()=>{}); } else toast('▶','回放刚才的录音','var(--pine)'); return true; }
+  if(a==='save'){
+    if(!LIVE){  // 演示模式：原来的假流程
+      const nv={id:'v'+Date.now(), name:vName.trim(), date:'10/7', status:'cloning'}; voices.push(nv); voiceSel=nv.id; $('#recSheet').hidden=true; rerenderMe(); toast('…',`正在复刻「${nv.name}」的声音，大约 10 秒`,'var(--pine)');
+      setTimeout(()=>{ nv.status='ready'; if(!$('#recSheet').hidden) return; rerenderMe(); toast('✓',`「${nv.name}」的声音好了，小搭现在用它和你说话`,'var(--pine)'); },2600); return true; }
+    liveSaveVoice(b); return true;
+  }
   return false;
 }
+// ---- 真实音色：录音、上传、切换、试听、改名、删除 ----
+let micStream = null, recChunks = [], recorder = null, voiceTimer = null, lastBlob = null;
+function micSupported(){ return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder); }
+function liveMicStart(){
+  if(!micSupported()){ toast('!','这个浏览器不能录音：正式功能里直接用设备录音（App 只做管理）；或用 https 打开本页','var(--warn)'); return Promise.resolve(false); }
+  return navigator.mediaDevices.getUserMedia({audio:true}).then(st=>{ micStream=st; recChunks=[]; recorder=new MediaRecorder(st);
+    recorder.ondataavailable=e=>{ if(e.data && e.data.size) recChunks.push(e.data); };
+    recorder.start(); return true;
+  }).catch(e=>{ toast('!', e.name==='NotAllowedError'?'没拿到麦克风权限，请在浏览器里允许':'打不开麦克风：'+e.name,'var(--warn)'); return false; });
+}
+function liveMicStop(){
+  return new Promise(res=>{
+    if(!recorder || recorder.state==='inactive'){ res(null); return; }
+    recorder.onstop=()=>{ lastBlob = new Blob(recChunks, {type:recorder.mimeType||'audio/webm'}); if(micStream) micStream.getTracks().forEach(t=>t.stop()); micStream=null; recorder=null; res(lastBlob); };
+    recorder.stop();
+  });
+}
+function liveSaveVoice(btn){
+  if(btn.disabled) return;
+  if(!lastBlob){ toast('!','先录一段再说','var(--warn)'); return; }
+  const fd = new FormData(); fd.append('audio', lastBlob, 'voice.webm'); fd.append('name', vName.trim());
+  $('#recSheet').hidden = true;
+  toast('…',`正在上传「${vName.trim()}」的录音…`,'var(--ai)');
+  fetch(API_BASE+'/panda/api/voices', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
+    if(!d.ok) throw new Error(d.error||'上传失败');
+    voices = d.voices; voiceSel = d.current; lastBlob = null; rerenderMe();
+    toast('…',`正在复刻「${vName.trim()}」的声音，约 30–60 秒`,'var(--ai)');
+    liveVoicePoll();
+  }).catch(e=>toast('!','没传上去：'+e.message,'var(--warn)'));
+}
+function liveVoicePoll(){
+  clearInterval(voiceTimer);
+  voiceTimer = setInterval(()=>{
+    api('/panda/api/voices').then(v=>{
+      if(!v || !v.voices) return;
+      const changing = v.voices.some(x=>x.status==='cloning');
+      voices = v.voices; voiceSel = v.current; rerenderMe();
+      if(!changing){
+        clearInterval(voiceTimer);
+        const bad = v.voices.find(x=>x.status==='failed');
+        if(bad) toast('!',`「${bad.name}」没复刻成功：${bad.error||'再试一次'}`,'var(--warn)');
+        else toast('✓','声音好了，点一下就能试听、切换','var(--pine)');
+      }
+    }).catch(()=>{});
+  }, 2500);
+}
+function liveVoicePick(v){
+  if(v.status==='cloning'){ toast('…',`「${v.name}」还在复刻，好了会提醒你`,'var(--ai)'); return; }
+  if(v.status==='failed'){ toast('!',`「${v.name}」没复刻成功：${v.error||'再录一次试试'}`,'var(--warn)'); return; }
+  toast('▶', `「${v.name}」在试听…`,'var(--pine)');
+  new Audio(API_BASE+'/panda/api/voices/preview?id='+encodeURIComponent(v.id)).play()
+    .catch(()=>toast('!','试听没播出来，再点一次','var(--warn)'));
+}
+function liveVoiceSelect(v){
+  api('/panda/api/voices/select', {id:v.id}).then(d=>{
+    if(!d.ok) throw new Error(d.reason||'切换失败');
+    voices = d.voices; voiceSel = d.current; rerenderMe();
+    toast('✓', v.sys?'换回小搭原声了':'小搭现在用这个声音和你说话','var(--pine)');
+  }).catch(e=>toast('!',e.message,'var(--warn)'));
+}
 document.addEventListener('input', e=>{ if(e.target.id==='vName'||e.target.id==='vAgree'){ vName=$('#vName').value; vAgree=$('#vAgree').checked; const btn=$('#recBox [data-v="save"]'); if(btn) btn.disabled=!(vName.trim()&&vAgree); } });
-document.addEventListener('change', e=>{ if(e.target.id==='vAgree'){ vAgree=e.target.checked; const btn=$('#recBox [data-v="save"]'); if(btn) btn.disabled=!(($('#vName').value||'').trim()&&vAgree); } });
+document.addEventListener('change', e=>{
+  if(e.target.id==='voiceFile' && e.target.files && e.target.files[0]){
+    lastBlob = e.target.files[0]; vDone = true; vShort = false; vRec = 0; renderRec();
+    toast('✓', '选好了，起个名字就能保存','var(--pine)'); return;
+  }
+  if(e.target.id==='vAgree'){ vAgree=e.target.checked; const btn=$('#recBox [data-v="save"]'); if(btn) btn.disabled=!(($('#vName').value||'').trim()&&vAgree); } });
 document.addEventListener('keydown', e=>{ if(e.target.id==='vRename' && e.key==='Enter'){ const b=document.querySelector('[data-v="rename-ok"]'); b&&b.click(); } });
 // 统一的数据格：上面是名称，中间是数字（单位小一号），下面是补充（可选；一整排要么都有，要么都没有）
 // 补充的颜色：up＝变好（绿），dn＝变差（橙），不写＝时间范围等说明（灰）
@@ -1536,10 +1624,12 @@ function applyLive(d){
   if(LIVE.growth){ const G = LIVE.growth; PYR = G.pyr; RADAR_NOW = G.radar.now; RADAR_THEN = G.radar.then; DIMS = G.radar.detail;
     WEAKEST = G.radar.weakest; ZONES = G.body.zones; if(!liveLoad.dimTouched) dimSel = WEAKEST; }
   devState = LIVE.online===true ? 'ok' : LIVE.online===false ? 'off' : 'idle';
+  if(d.voices){ voices = d.voices.voices; voiceSel = d.voices.current; }
   return true;
 }
 // 重新画，但别打断用户：打开着线路详情 / 修改面板 / 聊天时只更新数据，保留滚动位置
 function liveRender(){
+  if(!$('#recSheet').hidden) return;  // 正在录 / 起名字：别重画，否则输入框会被冲掉
   const y = SC.scrollTop; const sheet = !$('#routeSheet').hidden && $('#routeSheet').dataset.id;
   render(); SC.scrollTo({top:y});
   if(sheet && routes.find(x=>x.id===sheet) && $('#editSheet').hidden){ const py=$('#routePanel').scrollTop; openRoute(sheet); $('#routePanel').scrollTop=py; }
@@ -1547,7 +1637,8 @@ function liveRender(){
 function liveLoad(manual){
   if(!API_BASE) return Promise.resolve(false);
   if(manual){ devState='connecting'; render(); }
-  return api('/panda/api/state').then(d=>{
+  return api('/panda/api/voices').then(v=>{ if(v && v.voices){ voices = v.voices; voiceSel = v.current; } }).catch(()=>{})
+    .then(()=>api('/panda/api/state')).then(d=>{
     const first = !LIVE; if(!applyLive(d)) throw new Error('bad data');
     if(first || manual || !document.hidden) liveRender();
     if(manual) toast('✓', devState==='ok'?'攀搭在线，可以开始爬了':'数据已更新；设备按一下键就会连上', 'var(--sent)');
@@ -1581,6 +1672,6 @@ render(); fromHash();
 if(API_BASE){
   liveLoad(false).then(ok=>{ if(!ok) toast('!','没连上攀搭服务端，现在显示的是演示数据','var(--warn)'); });
   // 训练中每 8 秒刷新一次（按键、登记线路后手机上马上能看到）；聊天和修改面板打开时不刷新
-  setInterval(()=>{ if(!document.hidden && $('#chat').hidden && $('#editSheet').hidden && !document.activeElement.matches('input')) liveLoad(false); }, 8000);
+  setInterval(()=>{ if(!document.hidden && $('#chat').hidden && $('#editSheet').hidden && $('#recSheet').hidden && !document.activeElement.matches('input')) liveLoad(false); }, 8000);
 }
 </script>

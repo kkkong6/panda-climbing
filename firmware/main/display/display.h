@@ -63,6 +63,8 @@ public:
     virtual void SetPandaResult(int result) { (void)result; }
     // 攀搭：安全提醒全屏，level 0 = 隐藏，1 = 黄（重摔），2 = 红（摔后不动），3 = 暗红（闪烁的另一帧）
     virtual void SetPandaAlert(int level, const char* title, const char* sub) { (void)level; (void)title; (void)sub; }
+    // 攀搭：状态栏小图标 + 短句（0 隐藏，1 在听，2 想一想，3 准备好了，4 联网了，5 断网，6 电量低）
+    virtual void SetPandaStatus(int kind, const char* text) { (void)kind; (void)text; }
     virtual bool InsertAnimDialog(const char* name, uint32_t duration_ms) {
         (void)name;
         (void)duration_ms;

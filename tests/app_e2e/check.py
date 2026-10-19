@@ -7,7 +7,8 @@ import tempfile
 OUT = tempfile.mkdtemp(prefix="panda_app_e2e_")  # 截图放这里
 chrome = subprocess.Popen(["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "--headless=new",
                            f"--remote-debugging-port={CDP}", "--window-size=440,960", "--no-first-run",
-                           f"--user-data-dir={OUT}/chrome-prof", "about:blank"],
+                           f"--user-data-dir={OUT}/chrome-prof", "--use-fake-device-for-media-stream",
+                           "--use-fake-ui-for-media-stream", "about:blank"],
                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 fails = 0
 
@@ -43,8 +44,8 @@ async def main():
             await ws.send(json.dumps({"id": n[0], "method": method, "params": params}))
             return (await asyncio.wait_for(f, 30)).get("result", {})
 
-        async def js(expr):
-            r = await cmd("Runtime.evaluate", expression=expr, awaitPromise=True, returnByValue=True)
+        async def js(expr, gesture=False):
+            r = await cmd("Runtime.evaluate", expression=expr, awaitPromise=True, returnByValue=True, userGesture=gesture)
             if "exceptionDetails" in r:
                 return "JSERR " + json.dumps(r["exceptionDetails"])[:300]
             return r.get("result", {}).get("value")
@@ -115,7 +116,32 @@ async def main():
         check("KK" in t and "练了" in t and "e2:e2" in t, "我的：名字、训练周数、设备号")
         await shot("e2e_5_me")
 
-        print("④ 聊天（看板 AI 助手）")
+        print("④ 小搭的声音（音色复刻面板）")
+        await js("document.querySelector('[data-tab=me]').click()"); await asyncio.sleep(0.3)
+        t = await txt()
+        check("小搭原声" in t and "标签" not in t, "声音列表来自服务端（只有原声）")
+        check(await js("voices.length===1 && voiceSel==='buddy'"), "默认用小搭原声")
+        check(await js("!!document.querySelector('[data-v=add]')"), "有「录一个新声音」入口")
+        await shot("e2e_8_voices")
+        print("④b 真录音（假麦克风）→ 上传 → 服务端登记")
+        await js("openRec(); document.querySelector('[data-v=rec]').click()", gesture=True)
+        await asyncio.sleep(6.5)   # 录 6 秒以上才算合格
+        await js("document.querySelector('[data-v=rec]').click()", gesture=True)  # 停止
+        await asyncio.sleep(0.8)
+        check(await js("vDone===true && !!lastBlob"), f"录到了 {await js('Math.round(vRec)')} 秒的音频")
+        await js("const el=document.getElementById('vName'); if(el){el.value='测试小然'; el.dispatchEvent(new Event('input',{bubbles:true}));}")
+        await js("const c=document.getElementById('vAgree'); if(!c.checked) c.click();")
+        await asyncio.sleep(0.2)
+        await js("document.querySelector('[data-v=save]').click()", gesture=True)
+        await asyncio.sleep(2.0)
+        t = await txt()
+        ok = await js("voices.some(v=>v.name==='测试小然')")
+        check(ok and "测试小然" in t, "录音上传后在服务端登记成新声音")
+        st = await js("(voices.find(v=>v.name==='测试小然')||{}).status")
+        check(st in ("cloning", "failed"), f"状态是「复刻中」或明确失败（{st}），不是假装成功")
+        await shot("e2e_9_voice_saved")
+
+        print("⑤ 聊天（看板 AI 助手）")
         await js("document.querySelector('[data-tab=today]').click()")
         await js(f"openChat('{y3id}'); send('这条怎么突破？')"); await asyncio.sleep(1.0)
         m = await js("[...document.querySelectorAll('#msgs .msg.bot')].pop().innerText")
@@ -124,7 +150,7 @@ async def main():
         await shot("e2e_6_chat")
         await js("closeChat()")
 
-        print("⑤ 结束训练 → 复盘")
+        print("⑥ 结束训练 → 复盘")
         await js("document.getElementById('endBtn').click()"); await asyncio.sleep(1.5)
         t = await txt()
         check("小搭的结论" in t and "训练过程" in t and "下次练" in t, "复盘页出来了")
@@ -132,7 +158,7 @@ async def main():
         check(await js("ended===true && LIVE.session.ended"), "训练已结束")
         await shot("e2e_7_review")
 
-        print("⑥ 刷新不报错")
+        print("⑦ 刷新不报错")
         await js("liveLoad(false)"); await asyncio.sleep(0.8)
         check(not errors, "全程没有 JS 报错" + ("：" + "; ".join(errors[:3]) if errors else ""))
 

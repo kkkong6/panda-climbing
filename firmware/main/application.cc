@@ -13,6 +13,7 @@
 
 #include <driver/gpio.h>
 #include <esp_log.h>
+#include <esp_timer.h>
 #include <arpa/inet.h>
 #include <cJSON.h>
 #include <cstring>
@@ -22,6 +23,8 @@
 #define TAG "Application"
 // 攀搭：训练中多久没按键就问「今天结束了吗？」（分钟）
 #define PANDA_IDLE_MINUTES 30
+// 攀搭：电量低于这个百分比就在状态栏提醒
+#define PANDA_LOW_BATTERY 15
 
 Application::Application() : notify_player_(audio_service_) {
     event_group_ = xEventGroupCreate();
@@ -293,6 +296,24 @@ void Application::Run() {
             clock_ticks_++;
             auto display = Board::GetInstance().GetDisplay();
             display->UpdateStatusBar();
+            // 攀搭：限时的状态提示（如「准备好了」「联网了」）到时收起
+            if (panda_status_until_ && esp_timer_get_time() / 1000000 >= panda_status_until_) {
+                panda_status_until_ = 0;
+                display->SetPandaStatus(0, nullptr);
+            }
+            // 攀搭：电量低就一直在状态栏提醒（断网提示优先）；每 60 秒看一次
+            if (clock_ticks_ % 60 == 0 && panda_alert_ == kPandaAlertNone && !panda_status_until_) {
+                int level = 0;
+                bool charging = false, discharging = false;
+                auto& b = Board::GetInstance();
+                if (b.GetBatteryLevel(level, charging, discharging)) {
+                    bool low = !charging && discharging && level <= PANDA_LOW_BATTERY;
+                    if (low != panda_battery_low_) {
+                        panda_battery_low_ = low;
+                        display->SetPandaStatus(low ? 6 : 0, low ? "电量低" : nullptr);
+                    }
+                }
+            }
 
             // Print debug info every 10 seconds
             if (clock_ticks_ % 10 == 0) {
@@ -329,6 +350,11 @@ void Application::HandleNetworkConnectedEvent() {
     // Update the status bar immediately to show the network state
     auto display = Board::GetInstance().GetDisplay();
     display->UpdateStatusBar(true);
+    // 攀搭：联网了，亮 4 秒；断网期间如果挂过「断网」，这时收起来
+    if (GetDeviceState() == kDeviceStateIdle) {
+        display->SetPandaStatus(4, "联网了");
+        panda_status_until_ = (esp_timer_get_time() / 1000000) + 4;
+    }
 }
 
 void Application::HandleNetworkDisconnectedEvent() {
@@ -346,6 +372,9 @@ void Application::HandleNetworkDisconnectedEvent() {
     // Update the status bar immediately to show the network state
     auto display = Board::GetInstance().GetDisplay();
     display->UpdateStatusBar(true);
+    // 攀搭：断网了，一直显示到恢复（爬墙时不知道网络断了会白记录）
+    display->SetPandaStatus(5, "没网了");
+    panda_status_until_ = 0;
 }
 
 void Application::HandleActivationDoneEvent() {
@@ -377,6 +406,8 @@ void Application::HandleActivationDoneEvent() {
             // Play the success sound to indicate the device is ready
             audio_service_.PlaySound(Lang::Sounds::OGG_SUCCESS);
             Board::GetInstance().PandaVibrate("short1");  // 攀搭：准备好了，短震 1 下
+            Board::GetInstance().GetDisplay()->SetPandaStatus(3, "准备好了");  // 攀搭：亮一下，几秒后回到时钟
+            panda_status_until_ = (esp_timer_get_time() / 1000000) + 4;
         });
     }
 }
@@ -696,6 +727,10 @@ void Application::InitializeProtocol() {
                 Schedule([display, emotion_str = std::string(emotion->valuestring)]() {
                     display->SetEmotion(emotion_str.c_str());
                 });
+            }
+            // 攀搭：服务端开始处理这句话了（松手之后、小搭开口之前）
+            if (panda_alert_ == kPandaAlertNone) {
+                Schedule([display]() { display->SetPandaStatus(2, "想一想…"); });
             }
         } else if (strcmp(type->valuestring, "mcp") == 0) {
             auto payload = cJSON_GetObjectItem(root, "payload");
@@ -1046,6 +1081,7 @@ void Application::HandleStateChangedEvent() {
             // Keep a just-raised network error visible. SetDeviceState(idle)
             // queues STATE_CHANGED after Alert(), and the idle handler would
             // otherwise wipe the status, emotion, and chat message.
+            display->SetPandaStatus(0, nullptr);  // 攀搭：空闲后状态栏回到时钟
             if (last_error_message_.empty()) {
                 display->SetStatus(Lang::Strings::STANDBY);
                 display->ClearChatMessages();  // Clear messages first
@@ -1063,6 +1099,7 @@ void Application::HandleStateChangedEvent() {
         case kDeviceStateListening:
             display->SetStatus(Lang::Strings::LISTENING);
             display->SetEmotion("neutral");
+            display->SetPandaStatus(1, "在听…");  // 攀搭：按住说话，屏幕给个明确的「在听」
 
             // Make sure the audio processor is running
             if (play_popup_on_listening_ || !audio_service_.IsAudioProcessorRunning()) {
@@ -1081,6 +1118,7 @@ void Application::HandleStateChangedEvent() {
             break;
         case kDeviceStateSpeaking:
             display->SetStatus(Lang::Strings::SPEAKING);
+            display->SetPandaStatus(0, nullptr);  // 攀搭：开始说话了，状态提示收起来
 
             if (listening_mode_ != kListeningModeRealtime) {
                 audio_service_.EnableVoiceProcessing(false);

@@ -1538,3 +1538,63 @@ void LcdDisplay::SetPandaAlert(int level, const char* title, const char* sub) {
     lv_obj_remove_flag(panda_alert_, LV_OBJ_FLAG_HIDDEN);
     lv_obj_move_foreground(panda_alert_);
 }
+
+// ======================= 攀搭：状态栏小图标 + 短句 =======================
+// 和顶部网络 / 电量图标同一行，居中偏下一点：🎤 在听…、💬 想一想…、✓ 准备好了、📶 联网了、断网、🔋 电量低
+void LcdDisplay::SetPandaStatus(int kind, const char* text) {
+    DisplayLockGuard lock(this);
+    if (!setup_ui_called_) {
+        return;
+    }
+    if (panda_status_chip_ == nullptr) {
+        if (kind <= 0) {
+            return;
+        }
+        auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
+        auto text_font = lvgl_theme->text_font()->font();
+        panda_status_chip_ = lv_obj_create(status_bar_);
+        lv_obj_set_size(panda_status_chip_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+        lv_obj_set_style_radius(panda_status_chip_, 9, 0);
+        lv_obj_set_style_bg_opa(panda_status_chip_, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(panda_status_chip_, 0, 0);
+        lv_obj_set_style_pad_hor(panda_status_chip_, 3, 0);
+        lv_obj_set_style_pad_ver(panda_status_chip_, 0, 0);
+        lv_obj_set_style_pad_column(panda_status_chip_, 2, 0);
+        lv_obj_set_scrollbar_mode(panda_status_chip_, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_remove_flag(panda_status_chip_, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_flex_flow(panda_status_chip_, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(panda_status_chip_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_align(panda_status_chip_, LV_ALIGN_CENTER, 0, 0);
+        auto icon_font = lvgl_theme->icon_font()->font();
+        panda_status_icon_ = lv_label_create(panda_status_chip_);
+        lv_obj_set_style_text_font(panda_status_icon_, icon_font, 0);
+        panda_status_text_ = lv_label_create(panda_status_chip_);
+        lv_obj_set_style_text_font(panda_status_text_, text_font, 0);
+    }
+    if (kind <= 0 || text == nullptr) {
+        lv_obj_add_flag(panda_status_chip_, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+    struct Kind {
+        const char* icon;
+        uint32_t color;  // 文字和图标颜色；0 = 跟主题
+    };
+    const Kind kinds[] = {
+        {nullptr, 0},
+        {MATERIAL_SYMBOLS_MIC, 0x1E88E5},          // 在听：蓝（和 App 里蓝色麦克风一致）
+        {MATERIAL_SYMBOLS_CHAT_BUBBLE, 0x8A8578},  // 想一想：灰
+        {MATERIAL_SYMBOLS_CHECK_CIRCLE, 0x43A047}, // 准备好了：绿
+        {MATERIAL_SYMBOLS_WIFI, 0x43A047},         // 联网了：绿
+        {MATERIAL_SYMBOLS_WIFI_OFF, 0xE53935},     // 断网：红
+        {MATERIAL_SYMBOLS_BATTERY_ANDROID_FRAME_ALERT, 0xE53935},  // 电量低：红
+    };
+    int idx = (kind > 0 && kind < (int)(sizeof(kinds) / sizeof(kinds[0]))) ? kind : 0;
+    lv_label_set_text(panda_status_icon_, kinds[idx].icon ? kinds[idx].icon : "");
+    lv_label_set_text(panda_status_text_, text);
+    auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
+    lv_color_t col = kinds[idx].color ? lv_color_hex(kinds[idx].color) : lvgl_theme->text_color();
+    lv_obj_set_style_text_color(panda_status_icon_, col, 0);
+    lv_obj_set_style_text_color(panda_status_text_, col, 0);
+    lv_obj_remove_flag(panda_status_chip_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(panda_status_chip_);
+}

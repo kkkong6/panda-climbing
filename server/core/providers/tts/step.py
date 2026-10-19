@@ -39,6 +39,7 @@ class TTSProvider(TTSProviderBase):
 
     def __init__(self, config, delete_audio_file):
         super().__init__(config, delete_audio_file)
+        self.config = config or {}
         self.api_key = config.get("api_key")
         self.api_url = config.get("api_url", "https://api.stepfun.com/v1/audio/speech")
         self.model = config.get("model", "stepaudio-3-tts")
@@ -112,13 +113,28 @@ class TTSProvider(TTSProviderBase):
         finally:
             self._pending_synth_text = None
 
+    # ---------- 音色 ----------
+    def _voice_for_this_turn(self):
+        """当前用哪个音色：App 里选了复刻音色就用它（模型换成能复刻的 2.5），否则用原声。
+        复刻音色是按句读登记的，切一次不会多花时间；读失败不影响说话，退回原声"""
+        voice, model = self.voice, self.model
+        try:
+            from panda import voices
+            v, m = voices.current_voice(self.config)
+            if v != self.voice:
+                voice, model = v, m
+        except Exception:
+            pass
+        return voice, model
+
     # ---------- 调用 Step ----------
     async def text_to_speak(self, text, output_file):
         synth_text = self._pending_synth_text or text
+        voice, model = self._voice_for_this_turn()
         body = {
-            "model": self.model,
+            "model": model,
             "input": synth_text,
-            "voice": self.voice,
+            "voice": voice,
             "response_format": self.audio_file_type,
             "speed": self.speed,
             "volume": self.volume,
@@ -126,7 +142,7 @@ class TTSProvider(TTSProviderBase):
         instruction = self._build_instruction()
         if instruction:
             body["instruction"] = instruction
-        logger.bind(tag=TAG).info(f"Step TTS | 文本: {synth_text} | 语气: {instruction or '无'}")
+        logger.bind(tag=TAG).info(f"Step TTS | 文本: {synth_text} | 音色: {voice} | 语气: {instruction or '无'}")
 
         resp = requests.post(
             self.api_url,

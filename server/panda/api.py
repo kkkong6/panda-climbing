@@ -8,6 +8,12 @@
   POST /panda/api/note              加线路笔记 {device, route_id, text}；删除 {device, id, delete:true}
   POST /panda/api/chat              看板 AI 助手 {device, q, route_id?, history?:[{role, content}]}
   POST /panda/api/end               结束训练并生成复盘 {device}
+  GET  /panda/api/voices            小搭的声音：有哪些音色、当前用的哪个
+  POST /panda/api/voices            新录一个声音（multipart：audio 文件 + name；或 JSON {name}）+ 可选 text
+  POST /panda/api/voices/select     切换音色 {id}
+  POST /panda/api/voices/rename     改名 {id, name}
+  POST /panda/api/voices/delete     删除 {id}
+  GET  /panda/api/voices/preview?id=  试听（mp3；原声现场合成一句）
 
 不填 device 时用最近活动的那台设备。看板助手和设备上的小搭是同一个人设、同一份训练档案。
 """
@@ -17,12 +23,13 @@ import os
 import re
 import time
 import types
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 from aiohttp import web
 
 from config.logger import setup_logging
-from panda import store, appdata
+from panda import store, appdata, voices as voices_mod
 
 TAG = __name__
 logger = setup_logging()
@@ -87,6 +94,13 @@ class PandaApi:
         return next((p for p in cands if p and os.path.exists(p)), None)
 
     # ---------- 路由 ----------
+    @staticmethod
+    def make_app(config):
+        """给 http_server 和测试用：把接口挂到一个 aiohttp 应用上（请求体上限 20MB，录音要上传）"""
+        app = web.Application(client_max_size=20 * 1024 * 1024)
+        app.add_routes(PandaApi(config).routes())
+        return app
+
     def routes(self):
         return [
             web.get("/panda", self.page), web.get("/panda/", self.page),
@@ -96,6 +110,12 @@ class PandaApi:
             web.post("/panda/api/note", self.note),
             web.post("/panda/api/chat", self.chat),
             web.post("/panda/api/end", self.end),
+            web.get("/panda/api/voices", self.voices),
+            web.post("/panda/api/voices", self.voice_add),
+            web.post("/panda/api/voices/select", self.voice_select),
+            web.post("/panda/api/voices/rename", self.voice_rename),
+            web.post("/panda/api/voices/delete", self.voice_delete),
+            web.get("/panda/api/voices/preview", self.voice_preview),
             web.options("/panda/api/{tail:.*}", self.options),
         ]
 
@@ -235,3 +255,60 @@ class PandaApi:
         except asyncio.TimeoutError:
             ok = True  # 复盘还在后台生成，先返回数字
         return self._json({"ok": bool(ok), "state": await self._run(appdata.state, dev, self.config, online(dev))})
+
+    # ---------- 小搭的声音（音色复刻） ----------
+    async def voices(self, request):
+        return self._json(await self._run(voices_mod.list_voices))
+
+    async def voice_add(self, request):
+        """手机录音上传 mp4/webm/wav 都行；服务器转 wav 后请 Step 复刻（后台做，约 30–60 秒）"""
+        try:
+            data = await request.post() if request.content_type.startswith("multipart/") else {}
+        except Exception as e:
+            return self._json({"ok": False, "error": f"上传失败：{e}"}, 400)
+        if data:
+            up = data.get("audio")
+            name = data.get("name")
+            text = data.get("text")
+            if not up or not getattr(up, "file", None):
+                return self._json({"ok": False, "error": "没有收到录音"}, 400)
+            os.makedirs(voices_mod.VOICE_DIR, exist_ok=True)
+            tmp = os.path.join(voices_mod.VOICE_DIR, f"upload_{uuid.uuid4().hex[:8]}")
+            with open(tmp, "wb") as f:
+                while True:
+                    chunk = up.file.read(256 * 1024)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+        else:
+            b = await self._body(request)
+            return self._json({"ok": False, "error": "要用 multipart 上传录音（audio 字段）"}, 400)
+        try:
+            rec = await self._run(voices_mod.add, tmp, name, self.config, text)
+        except Exception as e:
+            logger.bind(tag=TAG).exception(f"音色复刻没开始：{e}")
+            return self._json({"ok": False, "error": str(e)}, 500)
+        logger.bind(tag=TAG).info(f"新录的声音「{rec['name']}」开始复刻")
+        return self._json({"ok": True, "voice": rec, **await self._run(voices_mod.list_voices)})
+
+    async def voice_select(self, request):
+        b = await self._body(request)
+        r = await self._run(voices_mod.select, b.get("id"))
+        return self._json(r, 200 if r.get("ok") else 400)
+
+    async def voice_rename(self, request):
+        b = await self._body(request)
+        r = await self._run(voices_mod.rename, b.get("id"), b.get("name"))
+        return self._json(r, 200 if r.get("ok") else 400)
+
+    async def voice_delete(self, request):
+        b = await self._body(request)
+        r = await self._run(voices_mod.delete, b.get("id"))
+        return self._json(r, 200 if r.get("ok") else 400)
+
+    async def voice_preview(self, request):
+        vid = request.query.get("id") or "buddy"
+        p = await self._run(voices_mod.preview_now, self.config, vid)
+        if not p:
+            return self._json({"ok": False, "error": "这个音色还没有试听"}, 404)
+        return web.FileResponse(p, headers={"Cache-Control": "no-cache", "Access-Control-Allow-Origin": "*"})

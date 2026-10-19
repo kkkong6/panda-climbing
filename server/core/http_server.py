@@ -40,7 +40,8 @@ class SimpleHttpServer:
             port = int(server_config.get("http_port", 8003))
 
             if port:
-                app = web.Application()
+                # 攀搭：手机录的音色样本要上传（默认 1MB 不够）
+                app = web.Application(client_max_size=20 * 1024 * 1024)
 
                 if not read_config_from_api:
                     # 如果没有开启智控台，只是单模块运行，就需要再添加简单OTA接口，用于下发websocket接口

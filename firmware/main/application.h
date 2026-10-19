@@ -196,6 +196,8 @@ private:
     // 攀搭：训练中 30 分钟没按键 → 问问是不是练完了
     esp_timer_handle_t panda_idle_timer_ = nullptr;
     bool panda_has_attempts_ = false;
+    int64_t panda_status_until_ = 0;  // 限时状态提示到什么时候（秒，0 = 没有）
+    bool panda_battery_low_ = false;  // 电量低提示是不是显示着
     void PandaResetIdleTimer();
     void PandaOnIdle();
 

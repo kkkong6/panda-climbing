@@ -57,7 +57,11 @@ class FakeLLM:
               ("。正在看黄色V3" if "【用户正在看的线路】黄色V3" in sys_ else "") + "。"
 
 
-api = PandaApi({"panda_app": {"gym": "此山抱石馆", "name": "KK", "wall": 4.2}, "prompt": "你是小搭"})
+from panda import voices
+voices.use_dir(tempfile.mkdtemp())  # 音色登记也放临时目录，不动真实数据
+api = PandaApi({"panda_app": {"gym": "此山抱石馆", "name": "KK", "wall": 4.2}, "prompt": "你是小搭",
+                "TTS": {"StepTTS": {"api_key": "", "voice": "yuanqishaonv"}}})
 api._llm = FakeLLM()
-app = web.Application(); app.add_routes(api.routes())
+app = api.make_app = None  # 占位，下一行建 app
+app = __import__("aiohttp").web.Application(client_max_size=20 * 1024 * 1024); app.add_routes(api.routes())
 web.run_app(app, host="127.0.0.1", port=int(sys.argv[1]), print=lambda *a: print("ready", flush=True))
